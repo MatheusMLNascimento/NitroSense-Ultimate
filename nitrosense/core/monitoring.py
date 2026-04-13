@@ -22,7 +22,7 @@ class MonitoringEngine:
     Central monitoring system for all hardware metrics.
     Provides cached, averaged data for stable UI updates.
     """
-    __slots__ = ('hardware', 'watchdog', 'last_temp', 'last_cpu_temp', 'last_gpu_temp', 'last_nbfc_rpm', 'last_timestamp', 'monitoring_active', 'monitoring_thread', 'last_monitor_time', 'suspend_detected', 'state_machine', 'dirty_cache', 'temp_history', 'rpm_history', 'timestamp_history')
+    __slots__ = ('hardware', 'watchdog', 'last_temp', 'last_cpu_temp', 'last_gpu_temp', 'last_nbfc_rpm', 'last_timestamp', 'monitoring_active', 'monitoring_thread', 'last_monitor_time', 'suspend_detected', 'state_machine', 'dirty_cache', 'temp_history', 'rpm_history', 'timestamp_history', 'update_counter')
 
     def __init__(self, hardware_manager: HardwareInterface, watchdog=None):
         self.hardware = hardware_manager

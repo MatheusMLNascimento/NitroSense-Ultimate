@@ -5,6 +5,7 @@ Handles pre-flight validation and startup splash screen.
 
 import sys
 import traceback
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -26,10 +27,11 @@ from nitrosense.core.logger import logger
 from nitrosense.i18n import t
 
 
-class QtSplashLogHandler:
+class QtSplashLogHandler(logging.Handler):
     """Custom log handler that writes to splash screen terminal."""
 
     def __init__(self, terminal: QPlainTextEdit):
+        super().__init__()
         self.terminal = terminal
 
     def emit(self, record):

@@ -21,8 +21,12 @@ rsync -a --exclude='.git' \
       --exclude='DOCS' \
       --exclude='*.pyc' \
       --exclude='__pycache__' \
+      --exclude='.pytest_cache' \
       --exclude='venv' \
       --exclude='*.log' \
+      --exclude='*.deb' \
+      --exclude='create_deb.sh' \
+      --exclude='.gitignore' \
       ./ "$DEB_DIR/usr/share/nitrosense/"
 
 # Criar arquivo de controle
@@ -78,8 +82,28 @@ EOF
 # Criar launcher
 cat > "$DEB_DIR/usr/local/bin/nitrosense" << 'EOF'
 #!/bin/bash
+# NitroSense Ultimate Launcher
+
+# Check if running in graphical environment
+if [ -z "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ]; then
+    echo "Error: NitroSense requires a graphical environment (X11 or Wayland)"
+    echo "Please run from a desktop environment or set DISPLAY variable"
+    exit 1
+fi
+
+# Quick dependency check
+python3 -c "import PyQt6, psutil, matplotlib, numpy" 2>/dev/null
+if [ $? -ne 0 ]; then
+    echo "Error: Missing required Python dependencies"
+    echo "Please install: python3-pyqt6, python3-psutil, python3-matplotlib, python3-numpy"
+    exit 1
+fi
+
+# Set working directory and Python path
 cd /usr/share/nitrosense
 export PYTHONPATH="/usr/share/nitrosense:$PYTHONPATH"
+
+# Execute the application
 exec python3 main.py "$@"
 EOF
 

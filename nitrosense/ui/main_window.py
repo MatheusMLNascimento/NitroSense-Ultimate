@@ -31,6 +31,11 @@ from .notifications import ToastManager
 from .window_state import WindowStateManager, ApplicationStateManager
 from .tray_icon import DynamicTrayIcon, TrayMenuBuilder, AutostartManager
 from .ux_utilities import DebouncedSlider, LoadingButton
+from .pages.home_page import HomePage
+from .pages.status_page import StatusPage
+from .pages.config_page import ConfigPage
+from .pages.labs_page import LabsPage
+from .pages.docs_page import DocsPage
 
 
 class NitroSenseApp(QMainWindow):

@@ -101,11 +101,11 @@ class DynamicTrayIcon:
             
             # Draw circle with color
             brush_color = color
-            painter.fillEllipse(
+            painter.setBrush(brush_color)
+            painter.drawEllipse(
                 4, 4,
                 self.icon_size.width() - 8,
-                self.icon_size.height() - 8,
-                brush_color
+                self.icon_size.height() - 8
             )
             
             # Draw border

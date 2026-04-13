@@ -180,7 +180,7 @@ class StatusPage(QWidget):
         """Create a status indicator block with minimal iconography."""
         frame = QFrame()
         frame.setStyleSheet(
-            "background-color: #ffffff; border: 2px solid #ffffff; border-radius: 20px;"
+            "background-color: #242730; border: 1px solid #2f3745; border-radius: 20px;"
         )
         frame.setFixedHeight(250)
         try:
@@ -194,7 +194,7 @@ class StatusPage(QWidget):
 
             name_container = QFrame()
             name_container.setStyleSheet(
-                "background: #f8f9ff; border-radius: 14px;"
+                "background: #1f2630; border-radius: 14px;"
             )
             name_layout = QHBoxLayout(name_container)
             name_layout.setContentsMargins(10, 8, 10, 8)
@@ -235,7 +235,7 @@ class StatusPage(QWidget):
         except Exception as exc:
             logger.error(f"Failed creating status block for {name}: {exc}", exc_info=True)
             frame = QFrame()
-            frame.setStyleSheet(f"background-color: {COLOR_SCHEME['surface']}; border-radius: 16px;")
+            frame.setStyleSheet("background-color: #242730; border-radius: 16px;")
             fallback_layout = QVBoxLayout(frame)
             fallback_label = QLabel(f"{name} (status unavailable)")
             fallback_label.setWordWrap(True)

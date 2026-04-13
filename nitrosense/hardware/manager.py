@@ -572,6 +572,39 @@ class HardwareManager(HardwareInterface):
             logger.debug(f"Failed to read RAM usage: {e}")
             return None
     
+    def get_fan_rpm(self, fan_index: int = 0) -> Optional[float]:
+        """Get fan RPM for given fan index."""
+        try:
+            # Try NBFC first if available
+            if self.binary_paths.get("nbfc"):
+                success, output = self.run_nbfc("status -a")
+                if success and output:
+                    # Parse NBFC output for fan RPM
+                    lines = output.split('\n')
+                    for line in lines:
+                        if 'Fan' in line and 'RPM' in line:
+                            try:
+                                # Extract RPM value from line like "Fan 0: 1200 RPM"
+                                parts = line.split()
+                                if len(parts) >= 3 and parts[2].isdigit():
+                                    return float(parts[2])
+                            except (ValueError, IndexError):
+                                continue
+            
+            # Fallback to sysfs sensors
+            for sensor_path in self._discovered_sensor_paths:
+                fan_path = sensor_path / f"fan{fan_index}_input"
+                if fan_path.exists():
+                    try:
+                        rpm_str = fan_path.read_text().strip()
+                        return float(rpm_str)
+                    except (ValueError, OSError):
+                        continue
+                        
+        except Exception as e:
+            logger.debug(f"Failed to read fan RPM: {e}")
+        return None
+    
     def set_fan_speed(self, speed: int) -> bool:
         """Set fan speed (0-100 percentage)."""
         try:

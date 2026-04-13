@@ -53,6 +53,7 @@ from nitrosense.ui.splash import (
     update_splash,
     log_validation_step,
     QtSplashLogHandler,
+    SplashWindow,
 )
 from nitrosense.i18n import initialize_i18n, t
 from nitrosense.ui.tray_icon import AutostartManager
@@ -69,7 +70,7 @@ class NitroSenseApplication(QApplication):
     system: Optional['NitroSenseSystem']
     worker: 'StartupWorker'
     startup_thread: QThread
-    main_window: Optional['NitroSenseApp']
+    main_window: 'NitroSenseApp'
     hotkeys_manager: Optional[HotkeysManager]
     log_handler: Optional[logging.Handler]
 
@@ -179,143 +180,6 @@ class LogViewerDialog(QDialog):
         self.viewer.copy()
 
 
-class SplashWindow(QWidget):
-    """
-    Resizable splash window with pre-flight validation.
-    Acts as the "Tester Supremo" - validates paths, permissions, assets, and sensors.
-    UI only launches if splash emits validation_success signal.
-    """
-    
-    validation_success = pyqtSignal()  # Emitted when all pre-flight checks pass
-    validation_failed = pyqtSignal(str)  # Emitted with error message on failure
-
-    def __init__(self, log_path: Path):
-        super().__init__()
-        self.log_path = log_path
-        self.validation_errors = []
-        self.log_handler: Optional[logging.Handler] = None
-        
-        self.setWindowTitle("NitroSense Ultimate—Tester Supremo")
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-        self.resize(1000, 700)
-        self.setMinimumSize(800, 600)
-        self.setStyleSheet("background-color: #141414;")
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
-
-        # Title
-        self.title_label = QLabel(t("NitroSense Ultimate"))
-        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.title_label.setFont(QFont("Segoe UI", 18, QFont.Weight.DemiBold))
-        self.title_label.setStyleSheet("color: #00d1ff;")
-        layout.addWidget(self.title_label)
-
-        # Subtitle
-        self.subtitle = QLabel(t("Tester Supremo—System Validation"))
-        self.subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.subtitle.setFont(QFont("Segoe UI", 10))
-        self.subtitle.setStyleSheet("color: #888;")
-        layout.addWidget(self.subtitle)
-
-        # Status message
-        self.message_label = QLabel(t("Validating system..."))
-        self.message_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.message_label.setFont(QFont("Segoe UI", 11))
-        self.message_label.setStyleSheet("color: #d1f2ff;")
-        layout.addWidget(self.message_label)
-
-        # Progress bar
-        self.progress_bar = QProgressBar(self)
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setTextVisible(False)
-        self.progress_bar.setStyleSheet(
-            "QProgressBar {"
-            "  border: 1px solid #444;"
-            "  border-radius: 9px;"
-            "  background: #20232a;"
-            "}",
-            "QProgressBar::chunk {"
-            "  background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #00d1ff, stop:1 #70e0ff);"
-            "  border-radius: 9px;"
-            "}"
-        )
-        layout.addWidget(self.progress_bar)
-
-        # Terminal for logs
-        self.terminal = QPlainTextEdit(self)
-        self.terminal.setReadOnly(True)
-        self.terminal.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-        self.terminal.setStyleSheet(
-            "QPlainTextEdit {"
-            "  font-family: 'Courier New';"
-            "  font-size: 11px;"
-            "  background: #11151b;"
-            "  color: #d1f2ff;"
-            "  border: 1px solid #2f3a4a;"
-            "  border-radius: 12px;"
-            "  padding: 10px;"
-            "}"
-        )
-        self.terminal.setMinimumHeight(300)
-        layout.addWidget(self.terminal, 1)
-
-        # Buttons
-        button_layout = QHBoxLayout()
-        self.copy_button = QPushButton(t("Copy Terminal"), self)
-        self.copy_button.setStyleSheet(
-            "QPushButton {"
-            "  color: #ffffff;"
-            "  background: #2d2d34;"
-            "  border-radius: 10px;"
-            "  padding: 8px 14px;"
-            "}"
-            "QPushButton:hover { background: #3f4b5b; }"
-        )
-        self.copy_button.clicked.connect(self.copy_terminal)
-        button_layout.addWidget(self.copy_button)
-        button_layout.addStretch()
-        
-        self.quit_button = QPushButton(t("Quit"), self)
-        self.quit_button.setStyleSheet(
-            "QPushButton {"
-            "  color: #ffffff;"
-            "  background: #2d2d34;"
-            "  border-radius: 10px;"
-            "  padding: 8px 14px;"
-            "}"
-            "QPushButton:hover { background: #3f4b5b; }"
-        )
-        self.quit_button.clicked.connect(self._on_quit)
-        button_layout.addWidget(self.quit_button)
-        layout.addLayout(button_layout)
-
-    def copy_terminal(self) -> None:
-        self.terminal.selectAll()
-        self.terminal.copy()
-        self.message_label.setText("Terminal copied to clipboard")
-
-    def _on_quit(self) -> None:
-        from PyQt6.QtWidgets import QApplication
-        app = QApplication.instance()
-        if app is not None:
-            app.quit()
-
-    def log_validation(self, message: str, status: str = "INFO") -> None:
-        """Log validation step with timestamp."""
-        timestamp = time.strftime("%H:%M:%S")
-        lines = [
-            f"[{timestamp}] {status}: {msg}" 
-            for msg in message.split('\n')
-        ]
-        self.terminal.appendPlainText('\n'.join(lines))
-        
-        if status == "ERROR":
-            self.validation_errors.append(message)
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run NitroSense Ultimate")
     parser.add_argument(
@@ -361,27 +225,6 @@ def check_prerequisites() -> bool:
     except Exception as e:
         logger.critical(f"Prerequisites check failed: {e}")
         return False
-
-
-def update_splash(splash: Optional[SplashWindow], message: str, value: int) -> None:
-    """Update splash text and progress bar."""
-    if not splash:
-        return
-    try:
-        if hasattr(splash, "message_label"):
-            splash.message_label.setText(message)
-        if hasattr(splash, "progress_bar"):
-            splash.progress_bar.setValue(value)
-    except Exception as exc:
-        logger.error(f"Failed updating splash screen: {exc}", exc_info=True)
-
-
-def log_validation_step(splash: Optional[SplashWindow], message: str, status: str = "INFO") -> None:
-    """Log validation step to splash terminal."""
-    if not splash or not hasattr(splash, 'log_validation'):
-        logger.info(f"[{status}] {message}")
-        return
-    splash.log_validation(message, status)
 
 
 class StartupWorker(QObject):
