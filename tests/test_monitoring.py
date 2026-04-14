@@ -11,23 +11,35 @@ class DummyHardware:
         self.rpm_data = 1200
         self.binary_paths = {}
 
-    def get_cpu_temp(self):
+    def get_cpu_temperature(self):
         return self.temp_data["cpu"]
 
     def read_acpi_raw_data(self, filepath):
         return b"45000\n"
 
-    def get_gpu_temp(self):
+    def get_gpu_temperature(self):
         return self.temp_data["gpu"]
 
     def get_fan_rpm(self):
         return self.rpm_data
+
+    def get_cpu_usage(self):
+        return 50.0
+
+    def get_ram_usage(self):
+        return 60.0
 
     def run_nbfc(self, command):
         return True, "ok"
 
     def get_system_load(self):
         return 0.5
+
+    def get_cpu_usage(self):
+        return 25.0
+
+    def get_ram_usage(self):
+        return 50.0
 
 
 def test_monitoring_engine_initialization():
@@ -125,6 +137,12 @@ def test_monitoring_with_hardware_failure():
 
         def get_system_load(self):
             return 0.5
+
+        def get_cpu_usage(self):
+            return 50.0
+
+        def get_ram_usage(self):
+            return 60.0
 
     hardware = FailingHardware()
     me = MonitoringEngine(hardware)

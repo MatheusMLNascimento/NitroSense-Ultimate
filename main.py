@@ -19,7 +19,7 @@ import signal
 import atexit
 import gc
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, List, Tuple
 
 # Ensure we can import from the package
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -73,6 +73,97 @@ class NitroSenseApplication(QApplication):
     main_window: 'NitroSenseApp'
     hotkeys_manager: Optional[HotkeysManager]
     log_handler: Optional[logging.Handler]
+
+    def _show_dependency_install_dialog(self, missing_apt: Dict[str, List[str]], missing_pip: Dict[str, List[str]], splash):
+        """Show dialog asking user if they want to install missing dependencies."""
+        from nitrosense.ui.dependency_install_dialog import DependencyInstallDialog
+        
+        # Check if user has saved preference
+        saved_preference = DependencyInstallDialog.load_install_preference()
+        if saved_preference is True:
+            # User previously chose auto-install, try to install automatically
+            self._perform_auto_install(missing_apt, missing_pip, splash)
+            return
+        elif saved_preference is False:
+            # User previously chose to skip, continue with limited functionality
+            self._continue_after_deps_check(None, splash)
+            return
+        
+        # No saved preference, show dialog
+        dialog = DependencyInstallDialog(missing_apt, missing_pip, splash)
+        dialog.installation_complete.connect(
+            lambda success, message: self._handle_installation_result(success, message, splash)
+        )
+        dialog.exec()
+    
+    def _perform_auto_install(self, missing_apt: Dict[str, List[str]], missing_pip: Dict[str, List[str]], splash):
+        """Perform automatic installation without showing dialog."""
+        from nitrosense.resilience.dependency_installer import DependencyInstaller
+        
+        installer = DependencyInstaller()
+        
+        apt_packages = []
+        for packages in missing_apt.values():
+            apt_packages.extend(packages)
+            
+        pip_packages = []
+        for packages in missing_pip.values():
+            pip_packages.extend(packages)
+        
+        try:
+            update_splash(splash, "Instalando dependências automaticamente...", 75)
+            
+            # Install APT packages
+            if apt_packages:
+                success, message = installer.install_apt_packages(apt_packages)
+                if not success:
+                    logger.warning(f"Auto-install failed: {message}")
+                    update_splash(splash, f"Instalação automática falhou: {message}", 75)
+                    self._continue_after_deps_check(None, splash)
+                    return
+            
+            # Install pip packages
+            if pip_packages:
+                success, message = installer.install_pip_packages(pip_packages)
+                if not success:
+                    logger.warning(f"Auto-install failed: {message}")
+                    update_splash(splash, f"Instalação automática falhou: {message}", 75)
+                    self._continue_after_deps_check(None, splash)
+                    return
+            
+            update_splash(splash, "Dependências instaladas automaticamente ✓", 80)
+            self._continue_after_deps_check(None, splash)
+            
+        except Exception as e:
+            logger.error(f"Auto-install error: {e}")
+            update_splash(splash, f"Erro na instalação automática: {e}", 75)
+            self._continue_after_deps_check(None, splash)
+    
+    def _handle_installation_result(self, success: bool, message: str, splash):
+        """Handle the result of dependency installation dialog."""
+        if success:
+            update_splash(splash, "Dependências instaladas com sucesso ✓", 80)
+        else:
+            update_splash(splash, f"Instalação pulada: {message}", 75)
+        
+        self._continue_after_deps_check(None, splash)
+    
+    def _continue_after_deps_check(self, system, splash):
+        """Continue startup after dependency check/installation."""
+        # Re-run dependency check to verify installation
+        if hasattr(self.worker, 'perform_startup'):
+            # Create a new system instance and re-validate
+            from nitrosense.system import NitroSenseSystem
+            system = NitroSenseSystem()
+            
+            err, bootstrap_msg = system.bootstrap()
+            if err != ErrorCode.SUCCESS:
+                logger.error(f"Post-install bootstrap failed: {get_error_description(err)}")
+                handle_startup_failure(splash, self, f"Post-install bootstrap failed: {get_error_description(err)}")
+                return
+            
+            # Continue with final startup
+            finish_startup(splash, self, system, self.startup_thread)
 
 SESSION_LOCK_DIR = Path.home() / ".config" / "nitrosense"
 SESSION_LOCK_FILE = SESSION_LOCK_DIR / ".session_lock"
@@ -234,6 +325,11 @@ class StartupWorker(QObject):
     validation_step = pyqtSignal(str, str)  # (message, status: INFO|WARN|ERROR)
     startup_failed = pyqtSignal(str)  # Failure reason
     startup_complete = pyqtSignal(object)  # NitroSenseSystem instance
+    dependency_install_prompt = pyqtSignal(object, object)  # (missing_apt, missing_pip)
+
+    def __init__(self):
+        super().__init__()
+        self.missing_deps_data = None
 
     def run(self) -> None:
         """Main startup sequence with comprehensive error handling."""
@@ -301,6 +397,16 @@ class StartupWorker(QObject):
                 deps = system.hardware_manager.check_dependencies()
                 dep_status = "OK" if all(deps.values()) else "Missing"
                 self.validation_step.emit(f"Dependencies: {dep_status}", "INFO")
+
+                # Check for missing dependencies that can be auto-installed
+                if not all(deps.values()):
+                    missing_apt, missing_pip = self._check_missing_installable_deps()
+                    if missing_apt or missing_pip:
+                        self.validation_step.emit("Missing installable dependencies detected", "WARN")
+                        # Store for later UI prompt
+                        self.missing_deps_data = (missing_apt, missing_pip)
+                    else:
+                        self.validation_step.emit("All critical dependencies available", "INFO")
             except Exception as e:
                 self.validation_step.emit(f"Dependency check error: {e}", "WARN")
 
@@ -317,6 +423,14 @@ class StartupWorker(QObject):
 
         self.update_progress.emit("✓ All validation passed—launching UI", 100)
         self.validation_step.emit("STARTUP SUCCESSFUL: All systems ready", "INFO")
+        
+        # Check if we need to prompt for dependency installation
+        if hasattr(self, 'missing_deps_data') and self.missing_deps_data:
+            missing_apt, missing_pip = self.missing_deps_data
+            if missing_apt or missing_pip:
+                self.dependency_install_prompt.emit(missing_apt, missing_pip)
+                return  # Wait for user decision
+        
         self.startup_complete.emit(system)
 
     def _check_prerequisites(self) -> bool:
@@ -376,6 +490,18 @@ class StartupWorker(QObject):
         except Exception as e:
             self.validation_step.emit(f"Path validation error: {e}", "ERROR")
             return False
+
+    def _check_missing_installable_deps(self) -> Tuple[Dict[str, List[str]], Dict[str, List[str]]]:
+        """
+        Check for missing dependencies that can be auto-installed.
+        
+        Returns:
+            Tuple of (missing_apt, missing_pip) dictionaries
+        """
+        from nitrosense.resilience.dependency_installer import DependencyInstaller
+        
+        installer = DependencyInstaller()
+        return installer.check_missing_dependencies()
 
     def _validate_system_integrity(self) -> bool:
         """Run 3-level system integrity check."""
@@ -790,6 +916,9 @@ def main():
     )
     app.worker.startup_complete.connect(
         lambda system: finish_startup(splash, app, system, startup_thread)
+    )
+    app.worker.dependency_install_prompt.connect(
+        lambda missing_apt, missing_pip: app._show_dependency_install_dialog(missing_apt, missing_pip, splash)
     )
     
     app.startup_thread.started.connect(app.worker.run)

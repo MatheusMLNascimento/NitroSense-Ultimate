@@ -14,6 +14,7 @@ import time
 import subprocess
 from ..core.logger import logger
 from ..core.error_codes import ErrorCode
+from ..core.constants import PERFORMANCE_CONFIG
 
 
 class HardwareWatchdog(QThread):
@@ -27,18 +28,18 @@ class HardwareWatchdog(QThread):
     timeout_detected = pyqtSignal()  # Signal when watchdog times out
     emergency_mode_activated = pyqtSignal()  # Signal when 100% fan emergency activated
     
-    def __init__(self, timeout_sec: int = 10, hardware_manager=None):
+    def __init__(self, timeout_sec: int = None, hardware_manager=None):
         super().__init__()
-        self.timeout_sec = timeout_sec
+        self.timeout_sec = timeout_sec or PERFORMANCE_CONFIG["watchdog_timeout"]
         self.hardware_manager = hardware_manager
         self.last_heartbeat = time.time()
         self.running = False
         self.last_reset_time = 0
-        self.reset_cooldown = 60  # Don't reset more than once per minute
+        self.reset_cooldown = PERFORMANCE_CONFIG["circuit_breaker_timeout"]  # Don't reset more than once per minute
         self.sensor_failure_count = 0
-        self.max_sensor_failures = 3
+        self.max_sensor_failures = PERFORMANCE_CONFIG["sensor_failure_threshold"]
         self.in_emergency_mode = False
-        logger.info(f"✅ HardwareWatchdog initialized ({timeout_sec}s timeout, emergency at {self.max_sensor_failures} failures)")
+        logger.info(f"✅ HardwareWatchdog initialized ({self.timeout_sec}s timeout, emergency at {self.max_sensor_failures} failures)")
     
     def heartbeat(self):
         """Hardware thread calls this to signal 'still alive'."""

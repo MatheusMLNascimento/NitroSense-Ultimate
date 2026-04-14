@@ -1,6 +1,6 @@
-# NitroSense Ultimate v2.0.0
+# NitroSense Ultimate v3.1.0
 
-Professional thermal and fan control application for Acer Nitro 5 on Ubuntu 24.04
+Professional thermal and fan control application for Acer Nitro 5 and compatible laptops on Ubuntu 24.04
 
 ## Features
 
@@ -9,10 +9,13 @@ Professional thermal and fan control application for Acer Nitro 5 on Ubuntu 24.0
 - **Semaphore Bus Protection**: Thread-safe NBFC communication with QSemaphore
 - **Exponential Backoff Retry**: Intelligent error recovery with progressive delays
 - **Hardware ID Validation**: Device compatibility checking
+- **Multi-Device Support**: Automatic detection and profile selection for compatible laptops
+- **Circuit Breaker Pattern**: Prevents infinite retries on persistent hardware failures
 
 ### 🧵 Multithreading Architecture (Tier 2)
 - **Hardware Worker Thread**: Non-blocking sensor reading
 - **Thread Pool Manager**: Async task execution (RAM purge, process scanning)
+- **Parallel Sensor Reading**: Concurrent CPU/GPU/RPM data acquisition
 - **Async Process Execution**: QProcess for long-running commands
 - **Garbage Collection**: Automatic memory cleanup every 100 UI cycles
 
@@ -28,16 +31,33 @@ Professional thermal and fan control application for Acer Nitro 5 on Ubuntu 24.0
 - **Real-time Graphs**: 30-point temperature history with matplotlib
 - **Status LED Grid**: 6 health indicators (NBFC, GPU, Sensors, Fan, RAM, Disk)
 - **Frost Mode**: Button for 120s of 100% cooling
+- **Automatic Dependency Installation**: Smart detection and installation of missing system/Python dependencies
+- **Debounced Configuration Saves**: Prevents UI lag from rapid settings changes
 
 ### 🛡️ Safety & Reliability (Tier 5)
 - **Global Exception Handler**: Custom error dialogs with full traceback
 - **Professional Logging**: RotatingFileHandler limited to 5MB
 - **Configuration Snapshots**: Export/import .nsbackup files
 - **Watchdog Monitoring**: Detects fan stalls under thermal load
+- **Dependency Graceful Degradation**: App continues with limited functionality when dependencies are missing
+- **Input Validation**: Range checking and schema validation for all settings
 
 ## Installation
 
-### Prerequisites
+### 🚀 Quick Start (Recommended)
+
+**One-command installation**:
+```bash
+git clone https://github.com/your-repo/nitrosense-ultimate.git
+cd nitrosense-ultimate
+python3 main.py
+```
+
+The application will **automatically detect and offer to install** any missing dependencies during startup!
+
+### 📦 Manual Installation
+
+If you prefer manual installation or automatic installation is not available:
 
 **Ubuntu 24.04**:
 ```bash
@@ -53,7 +73,26 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### Running the Application
+### 🔧 Automatic Dependency Installation
+
+The app includes **smart dependency detection** that can automatically install missing components:
+
+- **System Tools**: nbfc, nvidia-driver-535, lm-sensors
+- **Python Packages**: PyQt6, psutil, matplotlib, numpy, pynput
+
+**Requirements for Auto-Installation**:
+- Passwordless sudo access (configure with `sudo visudo`)
+- Internet connection
+- pip installed
+
+**How it works**:
+1. App detects missing dependencies during startup
+2. Shows a dialog asking for installation permission
+3. Automatically installs missing components
+4. Remembers your choice for future startups
+5. Continues with full functionality
+
+### 🎯 Running the Application
 
 ```bash
 python3 main.py

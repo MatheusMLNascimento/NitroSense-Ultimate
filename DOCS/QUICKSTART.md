@@ -8,9 +8,30 @@ This guide will help you get NitroSense Ultimate running on your Acer Nitro 5.
 # INSTALLATION STEPS
 # =============================================================================
 
-## Step 1: Install Dependencies
+## 🚀 Quick Installation (Recommended)
 
-### On Ubuntu 24.04:
+**Just run the app - it will install everything automatically!**
+
+```bash
+# Download and run
+git clone https://github.com/your-repo/nitrosense-ultimate.git
+cd nitrosense-ultimate
+python3 main.py
+```
+
+The application will detect missing dependencies and offer to install them automatically.
+
+**What gets installed automatically:**
+- System packages: nbfc, nvidia-driver-535, lm-sensors
+- Python packages: PyQt6, psutil, matplotlib, numpy
+
+## 📦 Manual Installation (Alternative)
+
+If automatic installation is not available, follow these manual steps:
+
+### Step 1: Install System Dependencies
+
+#### On Ubuntu 24.04:
 
 ```bash
 # Update package list
@@ -36,7 +57,7 @@ sudo cp /path/to/nitrosense/configs/acer-nitro-an515.nbfc \
 sudo systemctl enable --now nbfc_service
 ```
 
-## Step 2: Setup Python Environment
+### Step 2: Setup Python Environment
 
 ```bash
 # Navigate to project directory

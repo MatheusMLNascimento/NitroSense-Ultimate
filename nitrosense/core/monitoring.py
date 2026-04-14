@@ -62,11 +62,18 @@ class MonitoringEngine:
         Returns:
             Dictionary with all monitored values
         """
+        # Parallel sensor reads
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            cpu_future = executor.submit(self._get_cpu_temperature)
+            gpu_future = executor.submit(self._get_gpu_temperature)
+            hotspot_future = executor.submit(self._get_gpu_hotspot_temperature)
+            rpm_future = executor.submit(self._get_fan_rpm)
+
         metrics = {
-            "cpu_temp": self._get_cpu_temperature(),
-            "gpu_temp": self._get_gpu_temperature(),
-            "gpu_hotspot": self._get_gpu_hotspot_temperature(),
-            "fan_rpm": self._get_fan_rpm(),
+            "cpu_temp": cpu_future.result(),
+            "gpu_temp": gpu_future.result(),
+            "gpu_hotspot": hotspot_future.result(),
+            "fan_rpm": rpm_future.result(),
             "cpu_usage": self.hardware.get_cpu_usage(),
             "ram_usage": self.hardware.get_ram_usage(),
             "disk_usage": psutil.disk_usage("/").percent,
@@ -209,6 +216,12 @@ class MonitoringEngine:
     def get_temperature_trend(self) -> List[float]:
         """Get temperature history for graphing."""
         return list(self.temp_history)
+
+    def get_temperature_delta(self) -> float:
+        """Get the temperature delta (change) from the last two readings."""
+        if len(self.temp_history) >= 2:
+            return self.temp_history[-1] - self.temp_history[-2]
+        return 0.0
 
     def get_rpm_trend(self) -> List[int]:
         """Get RPM history for graphing."""
