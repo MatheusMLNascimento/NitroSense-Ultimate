@@ -17,6 +17,8 @@ import time
 import platform
 import json
 import subprocess
+import importlib
+import importlib.util
 from pathlib import Path
 from typing import Optional, Callable, Dict, Any
 from datetime import datetime
@@ -38,64 +40,61 @@ class HotkeysManager:
     
     def __init__(self):
         """Initialize hotkeys manager."""
-        self.hotkeys: Dict[str, Callable] = {}
+        self.hotkeys: Dict[str, Any] = {}
         self._listener = None
         self._pynput_available = self._check_pynput()
         self._running = False
-    
+
     def _check_pynput(self) -> bool:
         """Check if pynput is available for hotkey support."""
-        try:
-            from pynput import keyboard
-            logger.debug("pynput available for global hotkey support")
-            return True
-        except ImportError:
+        if importlib.util.find_spec("pynput") is None:
             logger.warning("pynput not installed; global hotkeys disabled")
             logger.info("Install pynput: pip install pynput")
             return False
-    
+
+        logger.debug("pynput available for global hotkey support")
+        return True
+
     def register_hotkey(self, hotkey: str, callback: Callable, description: str = "") -> bool:
         """
         Register a global hotkey.
-        
+
         Args:
             hotkey: Hotkey string (e.g., "ctrl+shift+f")
             callback: Function to call when hotkey is pressed
             description: Human-readable description
-            
+
         Returns:
             True if registered successfully
         """
         if not self._pynput_available:
             logger.warning(f"Cannot register hotkey '{hotkey}': pynput not available")
             return False
-        
+
         try:
-            from pynput import keyboard
-            
-            # Parse hotkey string
+            pynput = importlib.import_module("pynput")
+            keyboard = getattr(pynput, "keyboard")
+
             keys = self._parse_hotkey(hotkey)
             if not keys:
                 logger.error(f"Invalid hotkey format: {hotkey}")
                 return False
-            
-            # Create hotkey combination
-            hotkey_combo = keyboard.HotKey([], callback)
-            
-            # Store for reference
+
+            hotkey_combo = keyboard.HotKey(keys, callback)
+
             self.hotkeys[hotkey] = {
                 "callback": callback,
                 "description": description,
                 "combo": hotkey_combo
             }
-            
+
             logger.info(f"Registered hotkey '{hotkey}': {description}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to register hotkey '{hotkey}': {e}")
             return False
-    
+
     def _parse_hotkey(self, hotkey_str: str) -> list:
         """
         Parse hotkey string into pynput-compatible format.
@@ -105,8 +104,9 @@ class HotkeysManager:
             "alt+enter" -> [...]
         """
         try:
-            from pynput import keyboard
-            
+            pynput = importlib.import_module("pynput")
+            keyboard = getattr(pynput, "keyboard")
+
             parts = hotkey_str.lower().split("+")
             keys = []
             
@@ -147,11 +147,12 @@ class HotkeysManager:
             return False
         
         try:
-            from pynput import keyboard
-            
+            pynput = importlib.import_module("pynput")
+            keyboard = getattr(pynput, "keyboard")
+
             def on_press(key):
                 pass  # Handled by hotkey combo above
-            
+
             def on_release(key):
                 pass
             
@@ -221,21 +222,19 @@ class CrashReporter:
             
             # Kernel version
             try:
-                import subprocess
                 kernel_version = subprocess.check_output(
                     ["uname", "-a"],
                     timeout=5,
                     text=True
                 ).strip()
                 report_lines.append(f"KERNEL: {kernel_version}")
-            except:
+            except Exception:
                 pass
             
             # Video driver
             report_lines.append("")
             report_lines.append("VIDEO DRIVER:")
             try:
-                import subprocess
                 result = subprocess.check_output(
                     ["glxinfo", "-B"],
                     timeout=5,

@@ -20,6 +20,7 @@ from .resilience.dirty_bit import get_dirty_bit_cache
 from .resilience.watchdog import HardwareWatchdog
 from .resilience.system_integrity import SystemIntegrityCheck
 from .resilience.lazy_loader import get_lazy_loader
+from .core.constants import PERFORMANCE_CONFIG
 
 
 class NitroSenseSystem:
@@ -120,8 +121,9 @@ class NitroSenseSystem:
                 logger.warning(f"Diagnostics warning: {get_error_description(err)}")
             
             # 9. RESILIENCE: Start Hardware Watchdog AFTER monitoring is ready
-            logger.info("🐕 Starting hardware watchdog (10s timeout)...")
-            self.watchdog = HardwareWatchdog(timeout_sec=10)
+            watchdog_timeout = PERFORMANCE_CONFIG.get("watchdog_timeout", 10.0)
+            logger.info(f"🐕 Starting hardware watchdog ({watchdog_timeout:.0f}s timeout)...")
+            self.watchdog = HardwareWatchdog(timeout_sec=watchdog_timeout)
             self.watchdog.timeout_detected.connect(self._on_watchdog_timeout)
             self.watchdog.start()
             logger.info("✅ Hardware watchdog active")
@@ -198,9 +200,7 @@ class NitroSenseSystem:
             
             # Save any pending configuration
             if self.config_manager:
-                err = self.config_manager.save_config()
-                if err != ErrorCode.SUCCESS:
-                    logger.warning(f"Config save on shutdown: {get_error_description(err)}")
+                self.config_manager.flush()
             
             # Reset fan to balanced
             if self.fan_controller:

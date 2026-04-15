@@ -177,65 +177,44 @@ class StatusPage(QWidget):
         layout.addStretch()
 
     def _create_status_block(self, name: str, icon_key: str, fallback_text: str) -> QFrame:
-        """Create a status indicator block with minimal iconography."""
+        """Create a status block using the same visual template as the CPU/GPU cards."""
         frame = QFrame()
         frame.setStyleSheet(
-            "background-color: #242730; border: 1px solid #2f3745; border-radius: 20px;"
+            f"background-color: {COLOR_SCHEME['surface']}; border-radius: 24px;"
         )
-        frame.setFixedHeight(250)
+        frame.setFixedHeight(320)
         try:
             layout = QVBoxLayout(frame)
-            layout.setContentsMargins(20, 20, 20, 20)
-            layout.setSpacing(15)
+            layout.setContentsMargins(24, 24, 24, 24)
+            layout.setSpacing(12)
 
-            icon_label = QLabel()
-            self._apply_icon_to_label(icon_label, icon_key, fallback_text, QSize(100, 100))
-            layout.addWidget(icon_label, alignment=Qt.AlignmentFlag.AlignHCenter)
+            title_label = QLabel(name)
+            title_label.setFont(QFont("Segoe UI", 11, QFont.Weight.DemiBold))
+            title_label.setStyleSheet(f"color: {COLOR_SCHEME['text_secondary']}; letter-spacing: 0.4px;")
+            layout.addWidget(title_label)
 
-            name_container = QFrame()
-            name_container.setStyleSheet(
-                "background: #1f2630; border-radius: 14px;"
-            )
-            name_layout = QHBoxLayout(name_container)
-            name_layout.setContentsMargins(10, 8, 10, 8)
-            name_layout.setSpacing(10)
+            value_label = QLabel("Checking...")
+            value_label.setFont(QFont("Segoe UI", 34, QFont.Weight.Bold))
+            value_label.setStyleSheet(f"color: {COLOR_SCHEME['primary']};")
+            layout.addWidget(value_label)
 
-            led = QLabel("●")
-            led.setFont(QFont("Arial", 14))
-            led.setFixedWidth(16)
-            led.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            led.setStyleSheet("color: #007aff;")
-            name_layout.addWidget(led)
-
-            name_label = QLabel(name)
-            name_label.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-            name_label.setStyleSheet("color: #111111;")
-            name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            name_layout.addWidget(name_label)
-            name_layout.addStretch()
-
-            layout.addWidget(name_container)
-
-            status_label = QLabel("Checking...")
-            status_label.setFont(QFont("Segoe UI", 10))
-            status_label.setStyleSheet(f"color: {COLOR_SCHEME['text_primary']};")
-            status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            layout.addWidget(status_label)
-
-            detail_label = QLabel("…")
+            detail_label = QLabel("Verificando…")
             detail_label.setWordWrap(True)
-            detail_label.setFont(QFont("Segoe UI", 9))
+            detail_label.setFont(QFont("Segoe UI", 10))
             detail_label.setStyleSheet(f"color: {COLOR_SCHEME['text_secondary']};")
             layout.addWidget(detail_label)
 
-            setattr(frame, 'led', led)
-            setattr(frame, 'name_container', name_container)
-            setattr(frame, 'status_label', status_label)
+            icon_label = QLabel()
+            self._apply_icon_to_label(icon_label, icon_key, fallback_text, QSize(54, 54))
+            icon_label.setFixedSize(54, 54)
+            layout.addWidget(icon_label, alignment=Qt.AlignmentFlag.AlignLeft)
+
+            setattr(frame, 'value_label', value_label)
             setattr(frame, 'detail_label', detail_label)
         except Exception as exc:
             logger.error(f"Failed creating status block for {name}: {exc}", exc_info=True)
             frame = QFrame()
-            frame.setStyleSheet("background-color: #242730; border-radius: 16px;")
+            frame.setStyleSheet(f"background-color: {COLOR_SCHEME['surface']}; border-radius: 24px;")
             fallback_layout = QVBoxLayout(frame)
             fallback_label = QLabel(f"{name} (status unavailable)")
             fallback_label.setWordWrap(True)
@@ -338,16 +317,22 @@ class StatusPage(QWidget):
 
         block = self.status_blocks[key]
         color = "#34c759" if is_ok else "#ff9500"
+
+        if hasattr(block, 'value_label'):
+            block.value_label.setText(status_text)
+            block.value_label.setStyleSheet(f"color: {color};")
+        elif hasattr(block, 'status_label'):
+            block.status_label.setText(status_text)
+
+        if hasattr(block, 'detail_label'):
+            block.detail_label.setText(detail_text or "…")
+
         if hasattr(block, 'led'):
             block.led.setStyleSheet(f"color: {color};")
         if hasattr(block, 'name_container'):
             block.name_container.setStyleSheet(
                 f"background: {color}20; border-radius: 14px;"
             )
-        if hasattr(block, 'status_label'):
-            block.status_label.setText(status_text)
-        if hasattr(block, 'detail_label') and detail_text:
-            block.detail_label.setText(detail_text)
 
     def _get_gpu_stats(self):
         """Query NVIDIA GPU usage and memory if available."""

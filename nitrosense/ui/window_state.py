@@ -40,6 +40,13 @@ class WindowStateManager:
         self.state_file = self.STATE_FILE
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
     
+    @staticmethod
+    def _atomic_write(path: Path, content: str) -> None:
+        """Write content to disk atomically."""
+        temp_path = path.parent / f"{path.name}.tmp"
+        temp_path.write_text(content, encoding="utf-8")
+        os.replace(temp_path, path)
+    
     def save_window_state(self, window: QMainWindow) -> bool:
         """
         Save window geometry and state.
@@ -103,10 +110,10 @@ class WindowStateManager:
                 window.showMaximized()
             
             # Store last_tab for later use (after UI is fully initialized)
-            window._last_saved_tab = state.get("last_tab", 0)
+            setattr(window, '_last_saved_tab', state.get("last_tab", 0))
             
             # Store theme for later use
-            window._saved_theme = state.get("theme", "dark")
+            setattr(window, '_saved_theme', state.get("theme", "dark"))
             
             logger.debug(f"Window state restored from {self.state_file}")
             return True
@@ -130,9 +137,11 @@ class WindowStateManager:
                 state = json.loads(self.state_file.read_text())
                 tab_index = state.get("last_tab", 0)
             
-            if 0 <= tab_index < stacked_widget.count():
-                stacked_widget.setCurrentIndex(tab_index)
-                logger.debug(f"Restored tab index: {tab_index}")
+            if tab_index is not None:
+                count = stacked_widget.count() if stacked_widget is not None else 0
+                if count > 0 and 0 <= tab_index < count:
+                    stacked_widget.setCurrentIndex(tab_index)
+                    logger.debug(f"Restored tab index: {tab_index}")
         except Exception as e:
             logger.error(f"Failed to restore tab: {e}")
     
@@ -140,9 +149,10 @@ class WindowStateManager:
         """Get index of active tab from stacked widget."""
         try:
             # Access stacked_widget if it exists
-            if hasattr(window, 'stacked_widget'):
-                return window.stacked_widget.currentIndex()
-        except:
+            stacked_widget = getattr(window, 'stacked_widget', None)
+            if stacked_widget is not None:
+                return stacked_widget.currentIndex()
+        except Exception:
             pass
         return 0
     

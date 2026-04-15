@@ -24,6 +24,8 @@ class ErrorCode(IntEnum):
     HARDWARE_ID_MISMATCH = 107
     FAN_STALL_DETECTED = 108
     THERMAL_THROTTLING = 109
+    HARDWARE_NOT_AVAILABLE = 110
+    HARDWARE_INIT_FAILED = 111
     
     # System errors (200-299)
     PERMISSION_DENIED = 201
@@ -93,6 +95,8 @@ ERROR_DESCRIPTIONS = {
     ErrorCode.HARDWARE_ID_MISMATCH: "⚠️  Device is not Acer Nitro 5 compatible",
     ErrorCode.FAN_STALL_DETECTED: "🔴 Fan stall detected - possible hardware failure",
     ErrorCode.THERMAL_THROTTLING: "⚠️  CPU thermal throttling active",
+    ErrorCode.HARDWARE_NOT_AVAILABLE: "❌ Required hardware or drivers not available",
+    ErrorCode.HARDWARE_INIT_FAILED: "❌ Hardware backend initialization failed",
     
     # System
     ErrorCode.PERMISSION_DENIED: "❌ Insufficient permissions (root required)",

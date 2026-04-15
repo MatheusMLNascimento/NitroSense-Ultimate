@@ -5,10 +5,11 @@ Implements thermal prediction, emergency protocols, and process-based profiles.
 
 import subprocess
 import psutil
+import time
 import functools
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 from ..core.logger import logger
-from ..core.constants import THERMAL_CONFIG, PROCESS_PROFILES
+from ..core.constants import PERFORMANCE_CONFIG, THERMAL_CONFIG, PROCESS_PROFILES
 from ..core.error_codes import ErrorCode, SafeOperation
 
 
@@ -25,6 +26,8 @@ class PredictiveAIEngine:
         self.predictive_mode_active = False
         self.active_profile = None
         self.game_heat_state = False
+        self._profile_cache: Tuple[Optional[str], float] = (None, 0.0)
+        self._profile_cache_ttl: float = PERFORMANCE_CONFIG.get("profile_detection_cache_ttl", 5.0)
         logger.info("PredictiveAIEngine initialized")
 
     @functools.lru_cache(maxsize=128)
@@ -92,23 +95,31 @@ class PredictiveAIEngine:
     def detect_active_profile(self) -> Optional[str]:
         """
         Detect active application profile based on running processes.
-        
+
         Returns:
             Profile name (gaming, video_editing, office, cinema) or None
         """
+        now = time.time()
+        cached_profile, cached_until = self._profile_cache
+        if now < cached_until:
+            return cached_profile
+
+        detected_profile: Optional[str] = None
         try:
             running_processes = [p.name() for p in psutil.process_iter(["name"])]
-
             for profile_name, profile_cfg in PROCESS_PROFILES.items():
                 for process in profile_cfg["processes"]:
                     if process in running_processes:
+                        detected_profile = profile_name
                         logger.info(f"Profile detected: {profile_name}")
-                        return profile_name
+                        break
+                if detected_profile:
+                    break
+        except Exception as exc:
+            logger.debug(f"Profile detection failed: {exc}")
 
-        except Exception as e:
-            logger.debug(f"Profile detection failed: {e}")
-
-        return None
+        self._profile_cache = (detected_profile, now + self._profile_cache_ttl)
+        return detected_profile
 
     def get_profile_fan_speed(self, profile: str) -> Optional[int]:
         """Get recommended fan speed for profile."""

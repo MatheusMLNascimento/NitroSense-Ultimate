@@ -12,7 +12,7 @@ __LICENSE__ = "GPL-3.0"
 
 from .core.config import ConfigManager
 from .core.logger import setup_logging
-from .core.error_handler import setup_exception_handler
+from .core.app_exceptions import setup_global_exception_handlers as setup_exception_handler
 
 __all__ = [
     "ConfigManager",

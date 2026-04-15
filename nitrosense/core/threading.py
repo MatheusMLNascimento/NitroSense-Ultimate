@@ -182,6 +182,9 @@ class HardwareWorker(QThread):
         """Get disk I/O statistics."""
         try:
             io = psutil.disk_io_counters()
+            if io is None:
+                return {"read_mb_s": 0.0, "write_mb_s": 0.0}
+
             return {
                 "read_mb_s": io.read_bytes / (1024 * 1024),
                 "write_mb_s": io.write_bytes / (1024 * 1024),
@@ -214,7 +217,7 @@ class ThreadPoolManager:
     """Manages QThreadPool for async operations."""
 
     def __init__(self, max_threads: int = PERFORMANCE_CONFIG["thread_pool_size"]):
-        self.pool = QThreadPool.globalInstance()
+        self.pool = QThreadPool.globalInstance() or QThreadPool()
         self.pool.setMaxThreadCount(max_threads)
         logger.info(f"ThreadPoolManager initialized with {max_threads} threads")
 

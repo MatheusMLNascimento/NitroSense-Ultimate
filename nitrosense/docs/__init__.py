@@ -1,4 +1,5 @@
 """
-Documentation module for NitroSense Ultimate.
-Contains inline help and guides.
+Module documentation package.
+
+Contains user-facing documentation guides that can be accessed within the application.
 """

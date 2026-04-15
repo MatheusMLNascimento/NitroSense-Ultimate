@@ -35,7 +35,7 @@ class HardwareWatchdog(QThread):
         self.last_heartbeat = time.time()
         self.running = False
         self.last_reset_time = 0
-        self.reset_cooldown = PERFORMANCE_CONFIG["circuit_breaker_timeout"]  # Don't reset more than once per minute
+        self.reset_cooldown = PERFORMANCE_CONFIG["watchdog_reset_cooldown"]  # Minimum delay between emergency resets
         self.sensor_failure_count = 0
         self.max_sensor_failures = PERFORMANCE_CONFIG["sensor_failure_threshold"]
         self.in_emergency_mode = False
