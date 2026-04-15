@@ -1,0 +1,35 @@
+# Python caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+
+# Pytest
+.pytest_cache/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+
+# Logs and temp
+*.log
+*.session_lock
+*.tmp
+*.temp
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.deb
+
+# System files
+.DS_Store
+Thumbs.db
