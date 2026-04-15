@@ -31,9 +31,9 @@ SYSTEM_PATHS = {
 
 APP_CONFIG = {
     "app_name": "NitroSense Ultimate",
-    "version": "3.0.5",
-    "target_device": "Acer Nitro 5 (AN515-54)",
-    "architecture": "Resilience Framework v3.0 + Performance Optimization",
+    "version": "3.1.0",
+    "target_device": "Acer Nitro 5 and compatible laptops",
+    "architecture": "Resilience Framework v3.1 + Performance Optimization",
     "min_python_version": "3.12",
     "window_width": 1200,
     "window_height": 800,
@@ -137,17 +137,6 @@ PROCESS_PROFILES = {
     },
 }
 
-# ============================================================================
-# DEPENDENCIES
-# ============================================================================
-
-REQUIRED_DEPENDENCIES = {
-    "nbfc": "Fan control service",
-    "nvidia-smi": "NVIDIA GPU monitoring",
-    "sensors": "lm-sensors for CPU temp",
-    "git": "Version control (for auto-updates)",
-}
-
 PYTHON_DEPENDENCIES = [
     "PyQt6>=6.4.0",
     "psutil>=5.9.0",
@@ -188,11 +177,31 @@ PERFORMANCE_CONFIG = {
     "cache_size": 5,  # Keep last 5 sensor readings
     "graph_points": 30,  # Historical graph points
     "thread_pool_size": 4,
+    "cache_ttl": 2.0,  # Sensor cache time-to-live in seconds
+    "watchdog_timeout": 10.0,  # Watchdog timeout in seconds
+    "sensor_failure_threshold": 3,  # Consecutive failures before emergency mode
+    "debounce_delay": 300,  # Config save debounce delay in ms
+    "circuit_breaker_timeout": 60.0,  # Circuit breaker reset time in seconds
+    "max_circuit_breaker_failures": 5,  # Failures before circuit breaker opens
 }
 
 # ============================================================================
-# NOTIFICATION LEVELS
+# HARDWARE SUPPORT
 # ============================================================================
+
+SUPPORTED_MODELS = {
+    "Acer Nitro AN515-54": {
+        "ec_paths": ["/sys/kernel/debug/ec/ec0/io"],
+        "thermal_zones": ["/sys/class/thermal/thermal_zone0/temp"],
+        "description": "Acer Nitro 5 (AN515-54) - Primary supported model",
+    },
+    "Acer Nitro AN515-51": {
+        "ec_paths": ["/sys/kernel/debug/ec/ec0/io"],
+        "thermal_zones": ["/sys/class/thermal/thermal_zone0/temp"],
+        "description": "Acer Nitro 5 (AN515-51) - Compatible model",
+    },
+    # Add more models as support expands
+}
 
 class NotificationLevel(Enum):
     """Notification urgency levels for libnotify."""

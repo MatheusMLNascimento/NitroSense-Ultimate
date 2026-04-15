@@ -10,8 +10,9 @@ import threading
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
+from PyQt6.QtCore import QTimer
 from .logger import logger
-from .constants import THERMAL_CONFIG
+from .constants import THERMAL_CONFIG, PERFORMANCE_CONFIG
 
 
 class ConfigManager:
@@ -40,11 +41,28 @@ class ConfigManager:
         self._lock = threading.RLock()
         self._cache: Dict[str, Any] = {}
 
+        # Debounced save timer
+        self.save_timer = QTimer()
+        self.save_timer.setSingleShot(True)
+        self.save_timer.timeout.connect(self._do_save_config)
+
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self._load_config()
+        if not self._cache:
+            self._cache = self._get_default_config()
+            self.flush()  # Save defaults immediately
         self._initialized = True
 
         logger.info(f"ConfigManager initialized: {self.config_file}")
+
+    def save(self) -> None:
+        """Trigger debounced save of configuration."""
+        self.save_timer.start(PERFORMANCE_CONFIG["debounce_delay"])
+
+    def flush(self) -> None:
+        """Force immediate save of configuration."""
+        self.save_timer.stop()
+        self._do_save_config()
 
     def _load_config(self) -> None:
         """Load configuration from disk with schema validation."""
@@ -60,9 +78,10 @@ class ConfigManager:
                 except Exception as e:
                     logger.error(f"Failed to load config: {e}, using defaults")
                     self._cache = self._get_default_config()
+                    self.flush()
             else:
                 self._cache = self._get_default_config()
-                self._save_config()
+                self.flush()
 
     def _validate_and_repair_schema(self, loaded_config: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -142,10 +161,34 @@ class ConfigManager:
             "log_level": "INFO",
         }
 
-    def _save_config(self) -> None:
+    def _validate_config(self, config: Dict[str, Any]) -> None:
+        """Validate configuration values and ranges."""
+        if "thermal" in config:
+            thermal = config["thermal"]
+            if "cpu_target" in thermal:
+                if not 30 <= thermal["cpu_target"] <= 90:
+                    raise ValueError("CPU target temperature must be between 30-90°C")
+            if "gpu_target" in thermal:
+                if not 30 <= thermal["gpu_target"] <= 90:
+                    raise ValueError("GPU target temperature must be between 30-90°C")
+            if "idle_speed" in thermal:
+                if not 0 <= thermal["idle_speed"] <= 100:
+                    raise ValueError("Idle fan speed must be between 0-100%")
+            if "emergency_temp" in thermal:
+                if not 80 <= thermal["emergency_temp"] <= 110:
+                    raise ValueError("Emergency temperature must be between 80-110°C")
+
+        if "ui_scale" in config:
+            if not 0.5 <= config["ui_scale"] <= 2.0:
+                raise ValueError("UI scale must be between 0.5-2.0")
+
+    def _do_save_config(self) -> None:
         """Save configuration to disk atomically using temp file + os.replace()."""
         with self._lock:
             try:
+                # Validate configuration
+                self._validate_config(self._cache)
+
                 # Ensure config directory exists
                 self.config_dir.mkdir(parents=True, exist_ok=True)
                 
@@ -201,7 +244,7 @@ class ConfigManager:
             current[keys[-1]] = value
 
             if persist:
-                self._save_config()
+                self.save()
             logger.debug(f"Config updated: {key} = {value}")
 
     def get_thermal_config(self) -> Dict[str, Any]:
@@ -272,7 +315,7 @@ class ConfigManager:
             # Validate structure
             if "config" in imported_config:
                 self._cache = imported_config["config"]
-                self._save_config()
+                self.save()
                 logger.info(f"Configuration snapshot imported: {filepath}")
                 return True
             else:
@@ -286,5 +329,5 @@ class ConfigManager:
         """Reset all settings to defaults."""
         with self._lock:
             self._cache = self._get_default_config()
-            self._save_config()
+            self.save()
             logger.warning("Configuration reset to defaults")

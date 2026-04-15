@@ -18,6 +18,36 @@ from ...hardware.manager import HardwareManager
 from ...ui.icon_theme import load_icon_pixmap, load_icon
 
 
+class MetricCard(QFrame):
+    """Custom frame for metric display with value label."""
+
+    def __init__(self, title: str, value: str, subtitle: str, color: str, font_size: int = 42):
+        super().__init__()
+        self.setStyleSheet(
+            f"background-color: {COLOR_SCHEME['surface']}; border-radius: 24px; padding: 24px;"
+        )
+        self.setMinimumHeight(200)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+
+        title_label = QLabel(title)
+        title_label.setFont(QFont("Segoe UI", 11, QFont.Weight.DemiBold))
+        title_label.setStyleSheet(f"color: {COLOR_SCHEME['text_secondary']}; letter-spacing: 0.4px;")
+        layout.addWidget(title_label)
+
+        self.value_label = QLabel(value)
+        self.value_label.setFont(QFont("Segoe UI", font_size, QFont.Weight.Bold))
+        self.value_label.setStyleSheet(f"color: {color};")
+        layout.addWidget(self.value_label)
+
+        subtitle_label = QLabel(subtitle)
+        subtitle_label.setFont(QFont("Segoe UI", 10))
+        subtitle_label.setStyleSheet(f"color: {COLOR_SCHEME['text_secondary']};")
+        subtitle_label.setWordWrap(True)
+        layout.addWidget(subtitle_label)
+
+
 class HomePage(QWidget):
     """Home page with temperature display and control."""
 
@@ -35,7 +65,7 @@ class HomePage(QWidget):
             self.fan_controller = FanController(hardware_manager, config_manager)
             self.graph_paused = False
             self.dark_mode = False
-            self.auto_mode = True  # Start in auto mode
+            self.auto_mode = False  # Start in manual mode
 
             # UI
             self._init_ui()
@@ -72,9 +102,10 @@ class HomePage(QWidget):
         layout.addLayout(self.init_temperature_display())
         layout.addWidget(self.init_graph())
         layout.addLayout(self.init_controls())
+        layout.addLayout(self.init_status_area())
         layout.addStretch()
 
-    def init_temperature_display(self) -> QHBoxLayout:
+    def init_temperature_display(self) -> QVBoxLayout:
         """Create the main temperature and summary panel with human-centered hierarchy."""
         layout = QHBoxLayout()
         layout.setSpacing(18)
@@ -105,7 +136,27 @@ class HomePage(QWidget):
         layout.addWidget(self.gpu_card, 2)
         layout.addWidget(self.rpm_card, 2)
 
-        return layout
+        # Additional info labels
+        info_layout = QHBoxLayout()
+        info_layout.setSpacing(16)
+        
+        self.cooldown_label = QLabel("Cooldown: --")
+        self.cooldown_label.setFont(QFont("Segoe UI", 10))
+        self.cooldown_label.setStyleSheet(f"color: {COLOR_SCHEME['text_secondary']};")
+        info_layout.addWidget(self.cooldown_label)
+        
+        self.trend_label = QLabel("Trend: --")
+        self.trend_label.setFont(QFont("Segoe UI", 10))
+        self.trend_label.setStyleSheet(f"color: {COLOR_SCHEME['text_secondary']};")
+        info_layout.addWidget(self.trend_label)
+        
+        info_layout.addStretch()
+        
+        temp_layout = QVBoxLayout()
+        temp_layout.addLayout(layout)
+        temp_layout.addLayout(info_layout)
+
+        return temp_layout
 
     def _create_metric_card(
         self,
@@ -114,34 +165,8 @@ class HomePage(QWidget):
         subtitle: str,
         color: str,
         font_size: int = 42,
-    ) -> QFrame:
-        card = QFrame()
-        card.setStyleSheet(
-            f"background-color: {COLOR_SCHEME['surface']}; border-radius: 24px; padding: 24px;"
-        )
-        card.setMinimumHeight(200)
-
-        card_layout = QVBoxLayout(card)
-        card_layout.setSpacing(10)
-
-        title_label = QLabel(title)
-        title_label.setFont(QFont("Segoe UI", 11, QFont.Weight.SemiBold))
-        title_label.setStyleSheet(f"color: {COLOR_SCHEME['text_secondary']}; letter-spacing: 0.4px;")
-        card_layout.addWidget(title_label)
-
-        value_label = QLabel(value)
-        value_label.setFont(QFont("Segoe UI", font_size, QFont.Weight.Bold))
-        value_label.setStyleSheet(f"color: {color};")
-        card_layout.addWidget(value_label)
-
-        subtitle_label = QLabel(subtitle)
-        subtitle_label.setFont(QFont("Segoe UI", 10))
-        subtitle_label.setStyleSheet(f"color: {COLOR_SCHEME['text_secondary']};")
-        subtitle_label.setWordWrap(True)
-        card_layout.addWidget(subtitle_label)
-
-        card.value_label = value_label
-        return card
+    ) -> MetricCard:
+        return MetricCard(title, value, subtitle, color, font_size)
 
     def init_graph(self) -> QWidget:
         """Create temperature history graph."""
@@ -194,6 +219,7 @@ class HomePage(QWidget):
         self.fan_speed_slider.setValue(50)
         self.fan_speed_slider.setSingleStep(5)
         self.fan_speed_slider.setPageStep(10)
+        self.fan_speed_slider.setEnabled(True)  # Start enabled in manual mode
         self.fan_speed_slider.valueChanged.connect(self._sync_slider_label)
         self.fan_speed_slider.sliderReleased.connect(self._apply_fan_speed)
         self.fan_speed_slider.setStyleSheet(
@@ -222,6 +248,26 @@ class HomePage(QWidget):
         layout.addStretch()
         return layout
 
+    def init_status_area(self) -> QHBoxLayout:
+        """Create status display area."""
+        layout = QHBoxLayout()
+        layout.setSpacing(16)
+
+        # Mode indicator
+        self.mode_label = QLabel("Mode: Manual")
+        self.mode_label.setFont(QFont("Segoe UI", 10, QFont.Weight.Medium))
+        self.mode_label.setStyleSheet(f"color: {COLOR_SCHEME['text_secondary']};")
+        layout.addWidget(self.mode_label)
+
+        # Status message
+        self.status_label = QLabel("System ready")
+        self.status_label.setFont(QFont("Segoe UI", 10, QFont.Weight.Medium))
+        self.status_label.setStyleSheet(f"color: {COLOR_SCHEME['text_primary']};")
+        layout.addWidget(self.status_label)
+
+        layout.addStretch()
+        return layout
+
     def _style_button(self, button: QPushButton) -> None:
         """Apply consistent styling to buttons."""
         button.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -245,7 +291,7 @@ class HomePage(QWidget):
     def _sync_slider_label(self, value: int) -> None:
         try:
             self.fan_label.setText(f"Fan: {value}%")
-        except Exception as e:
+        except (AttributeError, ValueError) as e:
             logger.error(f"Failed syncing slider label: {e}")
 
     def _apply_fan_speed(self) -> None:
@@ -255,7 +301,8 @@ class HomePage(QWidget):
             self.status_label.setText(f"Fan speed set to {value}%")
             self.auto_mode = False  # Disable auto mode when slider is used
             self.mode_label.setText("Mode: Manual")
-        except Exception as e:
+            self.fan_speed_slider.setEnabled(True)  # Ensure slider is enabled in manual mode
+        except (AttributeError, RuntimeError, ValueError) as e:
             logger.error(f"Failed applying fan speed: {e}")
 
     def _enable_auto_mode(self) -> None:
@@ -263,8 +310,9 @@ class HomePage(QWidget):
             self.auto_mode = True
             self.mode_label.setText("Mode: Auto")
             self.status_label.setText("Auto mode enabled")
+            self.fan_speed_slider.setEnabled(False)  # Disable slider in auto mode
             logger.info("Auto mode manually enabled")
-        except Exception as e:
+        except (AttributeError, RuntimeError) as e:
             logger.error(f"Failed to enable auto mode: {e}")
 
     def _setup_error_state(self, message: str) -> None:
@@ -285,7 +333,6 @@ class HomePage(QWidget):
 
     def _update_display(self) -> None:
         """Update display with latest metrics."""
-        # ADICIONE ESTA LINHA NO INÍCIO:
         if not self.isVisible() or self.isMinimized():
             return
 
@@ -300,7 +347,8 @@ class HomePage(QWidget):
             if cpu_temp is not None:
                 self.cpu_card.value_label.setText(f"{cpu_temp:.1f}°C")
                 self._update_color(cpu_temp)
-                self.cooldown_label.setText(f"Cooldown: {self.ai_engine.get_cooldown_estimate(cpu_temp)}")
+                if hasattr(self, 'cooldown_label'):
+                    self.cooldown_label.setText(f"Cooldown: {self.ai_engine.get_cooldown_estimate(cpu_temp)}")
 
             if gpu_temp is not None:
                 self.gpu_card.value_label.setText(f"{gpu_temp:.1f}°C")
@@ -311,12 +359,16 @@ class HomePage(QWidget):
 
             # Thermal gradient
             temp_delta = self.monitoring.get_temperature_delta()
-            trend = self.ai_engine.calculate_thermal_gradient(temp_delta)
-            self.trend_label.setText(f"Trend: {trend}")
+            trend = self.ai_engine.calculate_thermal_gradient(
+                temp_delta
+            )
+            if hasattr(self, 'trend_label'):
+                self.trend_label.setText(f"Trend: {trend}")
 
             profile_event = self.ai_engine.refresh_profile_state()
             if profile_event == "closed":
-                self.status_label.setText("Game closed, silent mode restored")
+                if hasattr(self, 'status_label'):
+                    self.status_label.setText("Game closed, silent mode restored")
 
             # Calculate and apply speed
             if cpu_temp and not hasattr(self, '_frost_mode_active') and self.auto_mode:
@@ -330,19 +382,23 @@ class HomePage(QWidget):
             # Re-enable auto mode if temperature exceeds 75°C
             if cpu_temp and cpu_temp >= 75 and not self.auto_mode:
                 self.auto_mode = True
-                self.mode_label.setText("Mode: Auto (Temp > 75°C)")
+                if hasattr(self, 'mode_label'):
+                    self.mode_label.setText("Mode: Auto (Temp > 75°C)")
+                self.fan_speed_slider.setEnabled(False)  # Disable slider when auto mode is re-enabled
                 logger.info("Auto mode re-enabled due to high temperature")
 
             # Update graph
             if not self.graph_paused:
                 self._update_graph()
             else:
-                self.status_label.setText("Graph updates paused")
+                if hasattr(self, 'status_label'):
+                    self.status_label.setText("Graph updates paused")
 
             # Check watchdog
             if cpu_temp and fan_rpm is not None:
                 if self.ai_engine.check_fan_watchdog(cpu_temp, fan_rpm):
-                    self.status_label.setText("Fan Stall Detected!")
+                    if hasattr(self, 'status_label'):
+                        self.status_label.setText("Fan Stall Detected!")
 
         except Exception as e:
             logger.error(f"Display update error: {e}")
@@ -360,17 +416,14 @@ class HomePage(QWidget):
         else:
             color = "#ff0033"  # Critical
 
-        self.temp_label.setStyleSheet(f"color: {color};")
+        # Update temp label if it exists
+        self.cpu_card.value_label.setStyleSheet(f"color: {color};")
 
     def _update_graph(self) -> None:
         """Update temperature history graph."""
         try:
             temps = self.monitoring.get_temperature_trend()
             if temps:
-                self.ax.clear()
-                self.ax.plot(temps, color=COLOR_SCHEME['primary'], linewidth=2)
-                self.ax.fill_between(range(len(temps)), temps, alpha=0.3, color=COLOR_SCHEME['primary'])
-                self.ax.set_ylim(30, 100)   
                 self.ax.clear()
                 self.ax.plot(temps, color=COLOR_SCHEME['primary'], linewidth=2)
                 self.ax.fill_between(range(len(temps)), temps, alpha=0.3, color=COLOR_SCHEME['primary'])

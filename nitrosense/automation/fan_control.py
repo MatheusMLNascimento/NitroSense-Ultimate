@@ -5,7 +5,7 @@ Fan Control Logic - Direct interface to NBFC and thermal management.
 import time
 from typing import Optional
 from ..core.logger import logger
-from ..core.constants import THERMAL_CONFIG
+from ..core.constants import THERMAL_CONFIG, PERFORMANCE_CONFIG
 
 
 class FanController:
@@ -18,6 +18,9 @@ class FanController:
         self.hardware = hardware_manager
         self.config = config_manager
         self.current_speed = None
+        self.circuit_breaker_failures = 0
+        self.circuit_breaker_open = False
+        self.last_failure_time = 0
         logger.info("FanController initialized")
 
     def set_fan_speed(self, speed: int) -> bool:
@@ -30,6 +33,16 @@ class FanController:
         Returns:
             True if command succeeds within allowed retries.
         """
+        # Check circuit breaker
+        if self.circuit_breaker_open:
+            if time.time() - self.last_failure_time > PERFORMANCE_CONFIG["circuit_breaker_timeout"]:
+                self.circuit_breaker_open = False
+                self.circuit_breaker_failures = 0
+                logger.info("Circuit breaker reset, retrying fan control")
+            else:
+                logger.warning("Circuit breaker open, skipping fan speed change")
+                return False
+
         speed = max(0, min(100, speed))
         delays = [0.01, 0.05, 0.1]
         last_error = ""
@@ -54,6 +67,13 @@ class FanController:
 
             if attempt < len(delays):
                 time.sleep(delay)
+
+        # All attempts failed
+        self.circuit_breaker_failures += 1
+        if self.circuit_breaker_failures >= PERFORMANCE_CONFIG["max_circuit_breaker_failures"]:
+            self.circuit_breaker_open = True
+            self.last_failure_time = time.time()
+            logger.error(f"Circuit breaker opened after {self.circuit_breaker_failures} consecutive failures")
 
         logger.error(
             f"Fan speed command failed after {len(delays)} attempts: {last_error}"

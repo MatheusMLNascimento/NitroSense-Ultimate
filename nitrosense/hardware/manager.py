@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Optional, Tuple, Dict, Any, List
 from PyQt6.QtCore import QSemaphore
 from ..core.logger import logger
-from ..core.constants import SYSTEM_PATHS, RETRY_CONFIG, ErrorCode
+from ..core.constants import PERFORMANCE_CONFIG, SYSTEM_PATHS, SUPPORTED_MODELS, RETRY_CONFIG, ErrorCode
 from .interface import HardwareInterface
 
 
@@ -57,7 +57,7 @@ class HardwareManager(HardwareInterface):
         
         # Cache for sensor readings: {key: (value, timestamp)}
         self._sensor_cache: Dict[str, Tuple[Any, float]] = {}
-        self._cache_ttl = 2.0  # 2 seconds TTL for sensor data
+        self._cache_ttl = PERFORMANCE_CONFIG["cache_ttl"]  # Sensor cache TTL
         
         # Dynamic sysfs paths discovered at runtime
         self._discovered_sensor_paths: List[Path] = []
@@ -68,6 +68,23 @@ class HardwareManager(HardwareInterface):
         self._discover_sensor_paths()
         self._initialize_hardware()
         self._initialized = True
+
+        self.detected_model = self._detect_hardware_model()
+        logger.info(f"HardwareManager initialized for model: {self.detected_model}")
+
+    def _detect_hardware_model(self) -> str:
+        """Detect the hardware model from DMI information."""
+        try:
+            with open(SYSTEM_PATHS["DMI_PRODUCT"], "r") as f:
+                model = f.read().strip()
+            if model in SUPPORTED_MODELS:
+                return model
+            else:
+                logger.warning(f"Unsupported model detected: {model}")
+                return "Unknown"
+        except Exception as e:
+            logger.warning(f"Failed to detect hardware model: {e}")
+            return "Unknown"
 
     def _get_cached(self, key: str) -> Optional[Any]:
         """Get cached value if not expired."""
@@ -130,11 +147,12 @@ class HardwareManager(HardwareInterface):
         logger.info("Initializing hardware layer...")
 
         # Check EC module
-        if self._load_ec_module():
+        code, msg = self._load_ec_module()
+        if code == ErrorCode.SUCCESS:
             self.ec_available = True
             logger.info("✅ Embedded Controller initialized")
         else:
-            logger.warning("⚠️  EC module not available (some features limited)")
+            logger.warning(f"⚠️  EC module not available: {msg} (some features limited)")
 
         # Check NBFC service
         if self._check_nbfc_service():
@@ -143,10 +161,10 @@ class HardwareManager(HardwareInterface):
         else:
             logger.warning("⚠️  NBFC service not available")
 
-    def _load_ec_module(self) -> bool:
+    def _load_ec_module(self) -> tuple[ErrorCode, str]:
         """
         Load ec_sys kernel module with write support.
-        Returns True if successful or already loaded.
+        Returns (ErrorCode, message).
         """
         try:
             ec_sys_path = Path(SYSTEM_PATHS["EC_SYS"])
@@ -154,22 +172,25 @@ class HardwareManager(HardwareInterface):
             # Check if already loaded
             if ec_sys_path.exists():
                 logger.debug("EC module already loaded")
-                return True
+                return ErrorCode.SUCCESS, "EC module already loaded"
 
             if not self.has_root_privileges() and not self.is_pkexec_available():
                 logger.error("Root privileges or pkexec required to load EC module")
-                return False
+                return ErrorCode.PERMISSION_DENIED, "Root privileges required"
 
             nbfc_binary = self.binary_paths.get("nbfc", "nbfc")
             result = self._run_command_as_root([
                 "modprobe", "ec_sys", "write_support=1"
             ])
 
-            return result.returncode == 0
+            if result.returncode == 0:
+                return ErrorCode.SUCCESS, "EC module loaded successfully"
+            else:
+                return ErrorCode.EC_MODULE_LOAD_FAILED, f"modprobe failed: {result.stderr}"
 
         except Exception as e:
             logger.error(f"Failed to load EC module: {e}")
-            return False
+            return ErrorCode.EC_MODULE_LOAD_FAILED, str(e)
 
     def _check_nbfc_service(self) -> bool:
         """Check if NBFC service is active."""
@@ -365,10 +386,9 @@ class HardwareManager(HardwareInterface):
                 logger.debug(f"File not found: {filepath}")
                 return default
             
-            # Use context manager for safe file operations
-            with open(path, 'r', encoding='utf-8', errors='replace') as f:
-                content = f.read().strip()
-                return content if content else default
+            # Use Path.read_text for safe file operations
+            content = path.read_text(encoding='utf-8', errors='replace').strip()
+            return content if content else default
                 
         except PermissionError:
             logger.debug(f"Permission denied reading {filepath} (may need elevated privileges)")
@@ -641,8 +661,9 @@ class HardwareManager(HardwareInterface):
                 return ErrorCode.HARDWARE_NOT_AVAILABLE, msg
             
             # Try to load EC module
-            if not self._load_ec_module():
-                logger.warning("EC module loading failed, attempting degraded mode")
+            code, msg = self._load_ec_module()
+            if code != ErrorCode.SUCCESS:
+                logger.warning(f"EC module loading failed: {msg}, attempting degraded mode")
             
             # Check NBFC service
             if self.binary_paths.get("nbfc"):

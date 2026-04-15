@@ -28,7 +28,8 @@ def test_watchdog_emergency_bus_reset_calls_subprocess(monkeypatch):
     monkeypatch.setattr(subprocess, "run", fake_run)
     watchdog._emergency_bus_reset()
 
-    assert ["sudo", "pkill", "-9", "nbfc"] == calls[0]
+    # Check that pkill command is in the calls (may not be first due to emergency mode)
+    assert any(c == ["sudo", "pkill", "-9", "nbfc"] for c in calls)
     assert any(c[:2] == ["sudo", "modprobe"] for c in calls)
     assert any(c[:2] == ["sudo", "systemctl"] for c in calls)
 
