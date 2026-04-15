@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Optional, Tuple, Dict, Any, List
 from PyQt6.QtCore import QSemaphore
 from ..core.logger import logger
+from ..core.command_executor import CommandExecutor
 from ..core.constants import PERFORMANCE_CONFIG, SYSTEM_PATHS, SUPPORTED_MODELS, RETRY_CONFIG, ErrorCode
 from .interface import HardwareInterface
 
@@ -51,7 +52,8 @@ class HardwareManager(HardwareInterface):
 
         super().__init__()
         self.bus_semaphore = QSemaphore(1)
-        self.binary_paths = {}
+        self.binary_paths: Dict[str, str] = {}
+        self.command_executor: Optional[CommandExecutor] = None
         self.ec_available = False
         self.nbfc_available = False
         
@@ -65,6 +67,8 @@ class HardwareManager(HardwareInterface):
         self._max_sensor_failures = 3  # Force 100% fan after 3 consecutive failures
         
         self._resolve_binary_paths()
+        self.command_executor = CommandExecutor(self.binary_paths)
+        self.binary_paths = self.command_executor.binary_paths
         self._discover_sensor_paths()
         self._initialize_hardware()
         self._initialized = True
@@ -131,16 +135,11 @@ class HardwareManager(HardwareInterface):
 
     def has_root_privileges(self) -> bool:
         """Return True when the process runs with root privileges."""
-        if os.name == "nt":
-            return False
-        try:
-            return os.geteuid() == 0
-        except AttributeError:
-            return False
+        return self.command_executor.has_root_privileges() if self.command_executor else False
 
     def is_pkexec_available(self) -> bool:
         """Return True when pkexec is available on the system."""
-        return bool(self.binary_paths.get("pkexec"))
+        return self.command_executor.is_pkexec_available() if self.command_executor else False
 
     def _initialize_hardware(self) -> None:
         """Initialize and verify hardware access."""
@@ -178,10 +177,10 @@ class HardwareManager(HardwareInterface):
                 logger.error("Root privileges or pkexec required to load EC module")
                 return ErrorCode.PERMISSION_DENIED, "Root privileges required"
 
-            nbfc_binary = self.binary_paths.get("nbfc", "nbfc")
-            result = self._run_command_as_root([
+            assert self.command_executor is not None, "CommandExecutor is required for EC module loading"
+            result = self.command_executor.execute_root_command([
                 "modprobe", "ec_sys", "write_support=1"
-            ])
+            ], use_sudo=True)
 
             if result.returncode == 0:
                 return ErrorCode.SUCCESS, "EC module loaded successfully"
@@ -203,37 +202,6 @@ class HardwareManager(HardwareInterface):
             logger.error(f"NBFC service check failed: {e}")
             return False
 
-    def _run_command_as_root(self, command, use_sudo: bool = False) -> subprocess.CompletedProcess:
-        """
-        Execute command with root privileges.
-        Uses pkexec or sudo when required.
-        """
-        if isinstance(command, str):
-            command = ["sh", "-c", command]
-
-        if not isinstance(command, list):
-            raise ValueError("Root command must be provided as a list or string")
-
-        if self.has_root_privileges():
-            full_cmd = command
-        elif use_sudo and self.binary_paths.get("sudo"):
-            full_cmd = [self.binary_paths["sudo"]] + command
-        elif self.is_pkexec_available():
-            full_cmd = [self.binary_paths["pkexec"]] + command
-        else:
-            full_cmd = command
-
-        try:
-            result = subprocess.run(
-                full_cmd,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            return result
-        except subprocess.TimeoutExpired:
-            logger.error(f"Root command timeout: {' '.join(command)}")
-            raise
 
     def _run_protected_command(
         self,
@@ -465,8 +433,9 @@ class HardwareManager(HardwareInterface):
         """
         try:
             if require_root:
+                assert self.command_executor is not None, "CommandExecutor is required to write protected files"
                 cmd = f"echo '{content}' > {filepath}"
-                result = self._run_command_as_root(cmd, use_sudo=True)
+                result = self.command_executor.execute_root_command(cmd, use_sudo=True)
                 return result.returncode == 0
             else:
                 Path(filepath).write_text(content)
@@ -562,8 +531,8 @@ class HardwareManager(HardwareInterface):
             logger.debug(f"Failed to read GPU usage: {e}", exc_info=True)
         return None
     
-    def get_gpu_memory_stats(self) -> Tuple[Optional[int], Optional[int], Optional[float]]:
-        """Get GPU memory usage stats (used, total, and utilization)."""
+    def get_gpu_memory_stats(self) -> Tuple[Optional[float], Optional[int], Optional[int]]:
+        """Get GPU memory usage stats (utilization, used, and total)."""
         try:
             if not self.binary_paths.get("nvidia-smi"):
                 return None, None, None

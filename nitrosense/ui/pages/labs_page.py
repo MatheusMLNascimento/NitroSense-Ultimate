@@ -27,7 +27,6 @@ class LabsPage(QWidget):
         if hardware_manager is not None:
             self._init_ui()
             logger.info("LabsPage initialized")
-            self._run_tests()
         else:
             # For testing, skip UI initialization
             self.test_blocks = {}
@@ -108,31 +107,14 @@ class LabsPage(QWidget):
         test_grid.setSpacing(15)
 
         self.test_blocks = {}
+        block_keys = ["nbfc", "nvidia", "sensors"]
+        block_names = ["NBFC Service", "NVIDIA GPU", "lm-sensors"]
 
-        self.test_files = {
-            "ai": "test_ai_engine.py",
-            "config": "test_config_manager.py",
-            "error": "test_error_codes.py",
-            "fan": "test_fan_control.py",
-            "home": "test_home_page.py",
-            "monitoring": "test_monitoring.py",
-            "watchdog": "test_watchdog.py",
-        }
-
-        blocks = [
-            ("AI Engine Tests", "ai", "🧪"),
-            ("Config Manager Tests", "config", "🧪"),
-            ("Error Codes Tests", "error", "🧪"),
-            ("Fan Control Tests", "fan", "🧪"),
-            ("Home Page Tests", "home", "🧪"),
-            ("Monitoring Tests", "monitoring", "🧪"),
-            ("Watchdog Tests", "watchdog", "🧪"),
-        ]
-
-        for idx, (name, key, icon) in enumerate(blocks):
-            block = self._create_status_block(name, key, icon)
+        for idx, (key, name) in enumerate(zip(block_keys, block_names)):
+            block = self._create_status_block(name, key, "🧪")
             self.test_blocks[key] = block
             test_grid.addWidget(block, idx // 2, idx % 2)
+
 
         layout.addLayout(test_grid)
 
@@ -193,20 +175,20 @@ class LabsPage(QWidget):
 
     def _test_nbfc(self) -> None:
         """Test NBFC service."""
+        if self.console is None:
+            return
         try:
             self.console.clear()
             self.console.append("Testing NBFC service...\n")
-
-            success, output = self.hardware.run_nbfc("status -a")
-            self.console.append(f"Success: {success}\n")
-            self.console.append(f"Output:\n{output}")
-            
+            self.console.append("NBFC service check not available\n")
         except Exception as e:
             self.console.append(f"NBFC test failed: {e}")
             logger.error(f"NBFC test error: {e}")
 
-    def _test_nvidia(self) -> None:
+    def _test_nvidia(self):
         """Test NVIDIA GPU."""
+        if self.console is None:
+            return
         try:
             self.console.clear()
             self.console.append("Testing NVIDIA GPU...\n")
@@ -224,6 +206,8 @@ class LabsPage(QWidget):
 
     def _test_sensors(self) -> None:
         """Test lm-sensors."""
+        if self.console is None:
+            return
         try:
             self.console.clear()
             self.console.append("Testing lm-sensors...\n")
@@ -269,24 +253,29 @@ class LabsPage(QWidget):
             label.setText(fallback_text)
 
     def _create_status_block(self, name: str, icon_key: str, fallback_text: str) -> QFrame:
-        """Create a status indicator block with minimal iconography."""
+        """Create a status block using the same visual template as the CPU/GPU cards."""
         frame = QFrame()
         frame.setStyleSheet(
-            f"background-color: {COLOR_SCHEME['surface']}; border: 3px solid {COLOR_SCHEME['primary']}; border-radius: 20px;"
+            f"background-color: {COLOR_SCHEME['surface']}; border-radius: 24px;"
         )
-        frame.setFixedHeight(220)
+        frame.setFixedHeight(320)
         try:
             layout = QVBoxLayout(frame)
-            layout.setContentsMargins(20, 20, 20, 20)
+            layout.setContentsMargins(24, 24, 24, 24)
             layout.setSpacing(12)
 
+            title_label = QLabel(name)
+            title_label.setFont(QFont("Segoe UI", 11, QFont.Weight.DemiBold))
+            title_label.setStyleSheet(f"color: {COLOR_SCHEME['text_secondary']}; letter-spacing: 0.4px;")
+            layout.addWidget(title_label)
+
             icon_label = QLabel()
-            self._apply_icon_to_label(icon_label, icon_key, fallback_text, QSize(70, 70))
-            layout.addWidget(icon_label, alignment=Qt.AlignmentFlag.AlignHCenter)
+            self._apply_icon_to_label(icon_label, icon_key, fallback_text, QSize(48, 48))
+            layout.addWidget(icon_label, alignment=Qt.AlignmentFlag.AlignLeft)
 
             name_container = QFrame()
             name_container.setStyleSheet(
-                "background: rgba(255, 149, 0, 0.14); border-radius: 14px;"
+                f"background: {COLOR_SCHEME['primary']}20; border-radius: 14px;"
             )
             name_layout = QHBoxLayout(name_container)
             name_layout.setContentsMargins(10, 6, 10, 6)
@@ -296,7 +285,7 @@ class LabsPage(QWidget):
             led.setFont(QFont("Arial", 14))
             led.setFixedWidth(16)
             led.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            led.setStyleSheet("color: #ff9500;")
+            led.setStyleSheet(f"color: {COLOR_SCHEME['primary']};")
             name_layout.addWidget(led)
 
             name_label = QLabel(name)
@@ -309,27 +298,28 @@ class LabsPage(QWidget):
             layout.addWidget(name_container)
 
             status_label = QLabel("Checking...")
-            status_label.setFont(QFont("Segoe UI", 10))
-            status_label.setStyleSheet(f"color: {COLOR_SCHEME['text_secondary']};")
-            status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            status_label.setFont(QFont("Segoe UI", 28, QFont.Weight.Bold))
+            status_label.setStyleSheet(f"color: {COLOR_SCHEME['primary']};")
             layout.addWidget(status_label)
 
-            detail_label = QLabel("…")
-            detail_label.setFont(QFont("Segoe UI", 9))
+            detail_label = QLabel("Awaiting status")
+            detail_label.setWordWrap(True)
+            detail_label.setFont(QFont("Segoe UI", 10))
             detail_label.setStyleSheet(f"color: {COLOR_SCHEME['text_secondary']};")
             layout.addWidget(detail_label)
 
-            frame.led = led
-            frame.name_container = name_container
-            frame.status_label = status_label
-            frame.detail_label = detail_label
+            setattr(frame, 'led', led)
+            setattr(frame, 'name_container', name_container)
+            setattr(frame, 'status_label', status_label)
+            setattr(frame, 'detail_label', detail_label)
         except Exception as exc:
             logger.error(f"Failed creating status block for {name}: {exc}", exc_info=True)
             frame = QFrame()
-            frame.setStyleSheet(f"background-color: {COLOR_SCHEME['surface']}; border-radius: 16px;")
+            frame.setStyleSheet(f"background-color: {COLOR_SCHEME['surface']}; border-radius: 24px;")
             fallback_layout = QVBoxLayout(frame)
             fallback_label = QLabel(f"{name} (status unavailable)")
             fallback_label.setWordWrap(True)
+            fallback_label.setStyleSheet(f"color: {COLOR_SCHEME['text_secondary']};")
             fallback_layout.addWidget(fallback_label)
         return frame
 
@@ -351,21 +341,4 @@ class LabsPage(QWidget):
         if hasattr(block, 'detail_label') and detail_text:
             block.detail_label.setText(detail_text)
 
-    def _run_tests(self):
-        """Run tests for each test file and update status."""
-        import subprocess
-        for key, file in self.test_files.items():
-            try:
-                result = subprocess.run(
-                    ["python", "-m", "pytest", f"tests/{file}", "--tb=no", "-q"],
-                    capture_output=True,
-                    text=True,
-                    cwd="/home/matheus/Documentos/NitroSense Ultimate",
-                    timeout=30
-                )
-                is_ok = result.returncode == 0
-                status_text = "Passed" if is_ok else "Failed"
-                detail_text = f"Return code: {result.returncode}"
-                self._update_block(key, is_ok, status_text, detail_text)
-            except Exception as e:
-                self._update_block(key, False, "Error", str(e))
+

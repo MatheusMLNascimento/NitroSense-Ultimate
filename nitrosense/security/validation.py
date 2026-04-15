@@ -12,6 +12,7 @@ from typing import Tuple, Optional, List, Any
 import ssl
 import socket
 import importlib
+import importlib.util
 
 from ..core.logger import logger
 from ..core.error_codes import ErrorCode, SafeOperation
@@ -267,7 +268,12 @@ class BackendValidation:
         Reduces system call overhead.
         """
         try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_ICMP)
+            icmp_type = getattr(socket, "SOCK_ICMP", None)
+            if icmp_type is None:
+                logger.warning("ICMP sockets are not supported on this platform")
+                return ErrorCode.SOCKET_ERROR, -1.0
+
+            sock = socket.socket(socket.AF_INET, icmp_type)
             sock.settimeout(timeout)
             
             # Send ping

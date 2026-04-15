@@ -56,13 +56,7 @@ class NitroSenseApp(QMainWindow):
                 self._temporary_qapp = QApplication([])
 
             # Page management with lazy loading
-            self.pages: Dict[str, Optional[QWidget]] = {
-                "home": None,
-                "status": None,
-                "config": None,
-                "labs": None,
-                "docs": None,
-            }
+            self.pages: Dict[int, Optional[QWidget]] = {}
             self.page_classes: Dict[str, Type] = {}  # Will be populated lazily
             
             self.stacked_widget = QStackedWidget()
@@ -141,25 +135,25 @@ class NitroSenseApp(QMainWindow):
             logger.critical(f"Failed to initialize main window: {e}", exc_info=True)
             self._show_startup_error(str(e))
 
-    def eventFilter(self, obj, event: QEvent) -> bool:
+    def eventFilter(self, a0, a1: Optional[QEvent]) -> bool:
         """Monitor visibility and minimize events to optimize CPU."""
-        if obj == self:
-            if event.type() == QEvent.Type.ShowToParent:
+        if a0 == self and a1 is not None:
+            if a1.type() == QEvent.Type.ShowToParent:
                 self._is_visible = True
                 self._is_minimized = False
                 logger.debug("Window shown—resuming full refresh")
-            elif event.type() == QEvent.Type.HideToParent:
+            elif a1.type() == QEvent.Type.HideToParent:
                 self._is_visible = False
                 self._is_minimized = True
                 logger.debug("Window hidden—reducing update frequency")
-            elif event.type() == QEvent.Type.WindowStateChange:
+            elif a1.type() == QEvent.Type.WindowStateChange:
                 self._is_minimized = self.isMinimized()
                 if self._is_minimized:
                     logger.debug("Window minimized—sensor sample rate reduced")
                 else:
                     logger.debug("Window restored—resuming normal refresh")
         
-        return super().eventFilter(obj, event)
+        return super().eventFilter(a0, a1)
 
     def _periodic_cleanup_guarded(self) -> None:
         """Cleanup with visibility guard."""
@@ -250,20 +244,24 @@ class NitroSenseApp(QMainWindow):
         self._set_ui_timers_enabled(True)
         self.showNormal()
 
-    def changeEvent(self, event: QEvent) -> None:
-        if event.type() == QEvent.Type.WindowStateChange:
+    def changeEvent(self, a0: Optional[QEvent]) -> None:
+        if a0 is not None and a0.type() == QEvent.Type.WindowStateChange:
             if self.windowState() & Qt.WindowState.WindowMinimized:
                 self.enter_background_mode(reason="window minimized")
-            elif event.oldState() & Qt.WindowState.WindowMinimized:
-                self.exit_background_mode()
-        super().changeEvent(event)
+        super().changeEvent(a0)
 
     def _reload_config(self) -> None:
         """Hot-reload configuration."""
+        if self.config is None:
+            return
         try:
-            old_config = self.config._cache.copy()
-            self.config.reload_config()
-            if self.config._cache != old_config:
+            if hasattr(self.config, '_cache'):
+                old_config = self.config._cache.copy()
+            else:
+                old_config = None
+            if hasattr(self.config, 'reload_config'):
+                self.config.reload_config()
+            if old_config is not None and hasattr(self.config, '_cache') and self.config._cache != old_config:
                 logger.info("Configuration hot-reloaded")
                 # Optionally refresh UI elements that depend on config
                 self._apply_theme()  # In case theme changed
@@ -435,6 +433,7 @@ class NitroSenseApp(QMainWindow):
 
     def _init_status_bar(self) -> None:
         """Initialize status bar with metrics (Feature #14)."""
+        status_bar = None
         try:
             status_bar = QStatusBar()
             try:
@@ -458,15 +457,17 @@ class NitroSenseApp(QMainWindow):
         except Exception as e:
             logger.error(f"Failed to initialize status bar: {e}")
             # Continue without status bar
+            return
         
         # Status labels
         self.status_label_update = QLabel("Last update: --")
         self.status_label_fps = QLabel("FPS: --")
         self.status_label_memory = QLabel("Memory: --")
         
-        status_bar.addWidget(self.status_label_update)
-        status_bar.addPermanentWidget(self.status_label_fps, 0)
-        status_bar.addPermanentWidget(self.status_label_memory, 0)
+        if status_bar is not None:
+            status_bar.addWidget(self.status_label_update)
+            status_bar.addPermanentWidget(self.status_label_fps, 0)
+            status_bar.addPermanentWidget(self.status_label_memory, 0)
     
     def _update_status_bar(self) -> None:
         """Update status bar metrics (Feature #14)."""
@@ -509,12 +510,20 @@ class NitroSenseApp(QMainWindow):
         try:
             if index == 0:
                 monitoring_engine = getattr(self.system, 'monitoring', None) if self.system is not None else None
+                if self.hardware is None:
+                    raise ValueError("Hardware manager not initialized")
                 page = HomePage(self.hardware, self.config, monitoring_engine)
             elif index == 1:
+                if self.hardware is None:
+                    raise ValueError("Hardware manager not initialized")
                 page = StatusPage(self.hardware, self.config)
             elif index == 2:
+                if self.hardware is None:
+                    raise ValueError("Hardware manager not initialized")
                 page = ConfigPage(self.hardware, self.config)
             elif index == 3:
+                if self.hardware is None:
+                    raise ValueError("Hardware manager not initialized")
                 page = LabsPage(self.hardware, self.config)
             elif index == 4:
                 page = DocsPage(None)
@@ -607,7 +616,7 @@ class NitroSenseApp(QMainWindow):
                 self.config.set("fan_profile", "frost", persist=True)
             if self.hardware:
                 self.hardware.set_fan_speed(100)
-            self.toast_manager.show(t("Frost Mode activated"), duration=2000)
+            self.toast_manager.show_toast(t("Frost Mode activated"), duration=2000)
         except Exception as e:
             logger.error(f"Failed to activate Frost Mode: {e}")
     
@@ -622,12 +631,12 @@ class NitroSenseApp(QMainWindow):
     def _on_watchdog_timeout(self):
         """Watchdog timeout signal: hardware not responding."""
         logger.warning("Watchdog timeout: hardware not responding")
-        self.toast_manager.show(t("Hardware timeout detected"), duration=3000)
+        self.toast_manager.show_toast(t("Hardware timeout detected"), duration=3000)
     
     def _on_emergency_mode(self):
         """Emergency mode activated: fans forced to 100%."""
         logger.critical("EMERGENCY MODE: Fans forced to 100%")
-        self.toast_manager.show(t("Emergency: Fans forced to maximum"), duration=5000)
+        self.toast_manager.show_toast(t("Emergency: Fans forced to maximum"), duration=5000)
 
     def _apply_theme(self) -> None:
         """Apply theme based on persisted window state or defaults."""
@@ -690,13 +699,17 @@ class NitroSenseApp(QMainWindow):
         # Clear any expired weakrefs
         # (Add weakref management here if needed)
 
-    def closeEvent(self, event):
+    def closeEvent(self, a0):
         """Handle application closure."""
         logger.info("NitroSenseApp closing...")
-        self.update_timer.stop()
-        self.status_update_timer.stop()
-        self.config_reload_timer.stop()
-        self.update_check_timer.stop()
+        if self.update_timer is not None:
+            self.update_timer.stop()
+        if self.status_update_timer is not None:
+            self.status_update_timer.stop()
+        if self.config_reload_timer is not None:
+            self.config_reload_timer.stop()
+        if self.update_check_timer is not None:
+            self.update_check_timer.stop()
 
         # Clear toasts
         self.toast_manager.clear_all()
@@ -715,10 +728,11 @@ class NitroSenseApp(QMainWindow):
         # Cleanup loaded pages
         for page in self.pages.values():
             try:
-                if hasattr(page, 'cleanup'):
-                    page.cleanup()
+                if page is not None and hasattr(page, 'cleanup'):
+                    getattr(page, 'cleanup')()
             except Exception as e:
                 logger.error(f"Page cleanup error: {e}")
 
-        event.accept()
+        if a0 is not None:
+            a0.accept()
         logger.info("Application closed")

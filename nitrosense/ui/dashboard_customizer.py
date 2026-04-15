@@ -18,14 +18,13 @@ MOTIVO: Usuários precisam de info sempre visível sem abrir menus.
 """
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame, QLabel
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QMimeData, QPoint
 from PyQt6.QtGui import QFont, QDrag
-from PyQt6.QtCore import QMimeData, QPoint
 import json
 from pathlib import Path
 from typing import Dict, List, Optional
-from ...core.logger import logger
-from ...core.constants import COLOR_SCHEME
+from ..core.logger import logger
+from ..core.constants import COLOR_SCHEME
 
 
 class DraggableWidget(QFrame):
@@ -103,23 +102,23 @@ class DraggableWidget(QFrame):
         
         return bar
     
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, a0):
         """Start drag operation."""
-        if event.button() == Qt.MouseButton.LeftButton:
+        if a0.button() == Qt.MouseButton.LeftButton:
             self.is_dragging = True
-            self.drag_position = event.globalPos() - self.frameGeometry().topLeft()
-            event.accept()
+            self.drag_position = a0.globalPos() - self.frameGeometry().topLeft()
+            a0.accept()
     
-    def mouseMoveEvent(self, event):
+    def mouseMoveEvent(self, a0):
         """Handle drag movement."""
-        if self.is_dragging and self.drag_position:
-            self.move(event.globalPos() - self.drag_position)
-            event.accept()
+        if self.is_dragging and self.drag_position is not None:
+            self.move(a0.globalPos() - self.drag_position)
+            a0.accept()
     
-    def mouseReleaseEvent(self, event):
+    def mouseReleaseEvent(self, a0):
         """End drag operation."""
         self.is_dragging = False
-        event.accept()
+        a0.accept()
 
 
 class DashboardController:

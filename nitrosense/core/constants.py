@@ -179,10 +179,10 @@ PERFORMANCE_CONFIG = {
     "thread_pool_size": 4,
     "cache_ttl": 2.0,  # Sensor cache time-to-live in seconds
     "watchdog_timeout": 10.0,  # Watchdog timeout in seconds
+    "watchdog_reset_cooldown": 60.0,  # Minimum delay between emergency resets
     "sensor_failure_threshold": 3,  # Consecutive failures before emergency mode
+    "profile_detection_cache_ttl": 5.0,  # Seconds to cache active profile detection
     "debounce_delay": 300,  # Config save debounce delay in ms
-    "circuit_breaker_timeout": 60.0,  # Circuit breaker reset time in seconds
-    "max_circuit_breaker_failures": 5,  # Failures before circuit breaker opens
 }
 
 # ============================================================================

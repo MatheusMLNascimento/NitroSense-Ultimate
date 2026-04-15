@@ -26,7 +26,7 @@ class ToastNotification(QWidget):
         self, 
         message: str, 
         severity: str = "info",  # info, warning, critical
-        duration: int = 5000,  # milliseconds
+        duration: int = 2000,  # milliseconds
         parent: Optional[QWidget] = None
     ):
         """

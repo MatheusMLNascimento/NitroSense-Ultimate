@@ -13,3 +13,6 @@ markdown>=3.4.0
 
 # Optional but recommended
 notify2>=0.3.1
+
+# Development tooling
+mypy>=1.10.0

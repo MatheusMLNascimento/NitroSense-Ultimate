@@ -40,6 +40,10 @@ class MultiAxisGraph(QWidget):
         self.show_cpu = True
         self.show_gpu = True
         self.show_rpm = True
+        self._cpu_line = None
+        self._gpu_line = None
+        self._rpm_line = None
+        self._last_draw_time = 0.0
         
         self._init_ui()
         
@@ -93,7 +97,11 @@ class MultiAxisGraph(QWidget):
         self.ax_rpm.set_facecolor(COLOR_SCHEME['background'])
         self.ax_rpm.set_ylabel("Fan RPM", color="#ff9500", fontsize=9, fontweight='bold')
         self.ax_rpm.tick_params(axis='y', labelcolor="#ff9500")
-        
+
+        self._cpu_line, = self.ax_temp.plot([], [], color="#0099ff", linewidth=2, marker='o', markersize=3, label="CPU Temp")
+        self._gpu_line, = self.ax_temp.plot([], [], color="#00ff99", linewidth=2, marker='s', markersize=3, label="GPU Temp", alpha=0.8)
+        self._rpm_line, = self.ax_rpm.plot([], [], color="#ff9500", linewidth=2, marker='^', markersize=3, label="Fan RPM", alpha=0.8)
+
         # Create canvas
         self.canvas = FigureCanvas(self.figure)
         layout.addWidget(self.canvas)
@@ -112,108 +120,63 @@ class MultiAxisGraph(QWidget):
             gpu_temp: GPU temperature in °C
             fan_rpm: Fan speed in RPM
         """
-        # Add data (keep last 30 points)
+        should_draw = False
         if cpu_temp is not None:
+            if not self.cpu_temps or abs(cpu_temp - self.cpu_temps[-1]) >= 0.15:
+                should_draw = True
             self.cpu_temps.append(cpu_temp)
             if len(self.cpu_temps) > 30:
                 self.cpu_temps.pop(0)
-        
+
         if gpu_temp is not None:
+            if not self.gpu_temps or abs(gpu_temp - self.gpu_temps[-1]) >= 0.15:
+                should_draw = True
             self.gpu_temps.append(gpu_temp)
             if len(self.gpu_temps) > 30:
                 self.gpu_temps.pop(0)
-        
+
         if fan_rpm is not None:
+            if not self.fan_rpms or abs(fan_rpm - self.fan_rpms[-1]) >= 25:
+                should_draw = True
             self.fan_rpms.append(fan_rpm)
             if len(self.fan_rpms) > 30:
                 self.fan_rpms.pop(0)
-        
-        # Update timestamps
-        self.timestamps = list(range(len(self.cpu_temps)))
-        
-        # Redraw graph
-        self._draw_graph()
+
+        self.timestamps = list(range(max(len(self.cpu_temps), len(self.gpu_temps), len(self.fan_rpms))))
+
+        if should_draw:
+            self._draw_graph()
     
     def _draw_graph(self) -> None:
         """Redraw the multi-axis graph."""
         try:
-            # Clear old lines
-            self.ax_temp.clear()
-            self.ax_rpm.clear()
-            
-            # Setup axes
             self.ax_temp.set_facecolor(COLOR_SCHEME['background'])
             self.ax_rpm.set_facecolor(COLOR_SCHEME['background'])
-            
             self.ax_temp.set_xlabel("Time (s)", color=COLOR_SCHEME['text_secondary'], fontsize=8)
             self.ax_temp.set_ylabel("Temperature (°C)", color="#0099ff", fontsize=9, fontweight='bold')
             self.ax_temp.tick_params(axis='y', labelcolor="#0099ff")
             self.ax_temp.tick_params(axis='x', labelcolor=COLOR_SCHEME['text_secondary'])
-            
             self.ax_rpm.set_ylabel("Fan RPM", color="#ff9500", fontsize=9, fontweight='bold')
             self.ax_rpm.tick_params(axis='y', labelcolor="#ff9500")
-            
-            # Plot temperature data on primary axis
-            if self.show_cpu and len(self.cpu_temps) > 1:
-                self.ax_temp.plot(
-                    self.timestamps, 
-                    self.cpu_temps,
-                    color="#0099ff",
-                    linewidth=2,
-                    marker='o',
-                    markersize=3,
-                    label="CPU Temp"
-                )
-            
-            if self.show_gpu and len(self.gpu_temps) > 1:
-                self.ax_temp.plot(
-                    self.timestamps,
-                    self.gpu_temps,
-                    color="#00ff99",
-                    linewidth=2,
-                    marker='s',
-                    markersize=3,
-                    label="GPU Temp",
-                    alpha=0.8
-                )
-            
-            # Plot RPM data on secondary axis
-            if self.show_rpm and len(self.fan_rpms) > 1:
-                self.ax_rpm.plot(
-                    self.timestamps,
-                    self.fan_rpms,
-                    color="#ff9500",
-                    linewidth=2,
-                    marker='^',
-                    markersize=3,
-                    label="Fan RPM",
-                    alpha=0.8
-                )
-            
-            # Grid
+
+            self._cpu_line.set_data(self.timestamps if self.show_cpu else [], self.cpu_temps if self.show_cpu else [])
+            self._gpu_line.set_data(self.timestamps if self.show_gpu else [], self.gpu_temps if self.show_gpu else [])
+            self._rpm_line.set_data(self.timestamps if self.show_rpm else [], self.fan_rpms if self.show_rpm else [])
+
+            self.ax_temp.relim()
+            self.ax_temp.autoscale_view(scalex=True, scaley=True)
+            self.ax_rpm.relim()
+            self.ax_rpm.autoscale_view(scalex=True, scaley=True)
+
             self.ax_temp.grid(True, alpha=0.2, linestyle='--')
-            
-            # Set y-axis limits with padding
-            temps = [t for temps in [self.cpu_temps, self.gpu_temps] for t in temps if temps]
-            if temps:
-                temp_min = min(temps)
-                temp_max = max(temps)
-                temp_padding = (temp_max - temp_min) * 0.1 + 5
-                self.ax_temp.set_ylim(max(0, temp_min - temp_padding), temp_max + temp_padding)
-            
-            if self.fan_rpms:
-                rpm_max = max(self.fan_rpms) * 1.1 + 100
-                self.ax_rpm.set_ylim(0, rpm_max)
-            
-            # Combine legends
+
             lines1, labels1 = self.ax_temp.get_legend_handles_labels()
             lines2, labels2 = self.ax_rpm.get_legend_handles_labels()
             self.ax_temp.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=8)
-            
+
             self.canvas.draw_idle()
-        
-        except Exception as e:
-            logger.error(f"Graph draw error: {e}")
+        except Exception as exc:
+            logger.error(f"Graph draw error: {exc}")
     
     def _on_cpu_toggled(self, state: int) -> None:
         """Handle CPU checkbox toggle."""

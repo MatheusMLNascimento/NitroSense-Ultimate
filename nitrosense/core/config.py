@@ -10,7 +10,6 @@ import threading
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
-from PyQt6.QtCore import QTimer
 from .logger import logger
 from .constants import THERMAL_CONFIG, PERFORMANCE_CONFIG
 
@@ -39,12 +38,9 @@ class ConfigManager:
         self.config_dir = Path.home() / ".config" / "nitrosense"
         self.config_file = self.config_dir / "config.json"
         self._lock = threading.RLock()
+        self._timer_lock = threading.Lock()
+        self._save_timer: Optional[threading.Timer] = None
         self._cache: Dict[str, Any] = {}
-
-        # Debounced save timer
-        self.save_timer = QTimer()
-        self.save_timer.setSingleShot(True)
-        self.save_timer.timeout.connect(self._do_save_config)
 
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self._load_config()
@@ -55,13 +51,27 @@ class ConfigManager:
 
         logger.info(f"ConfigManager initialized: {self.config_file}")
 
+    def _schedule_save(self, delay: float) -> None:
+        """Schedule a debounced configuration save using a plain Python timer."""
+        with self._timer_lock:
+            if self._save_timer is not None:
+                self._save_timer.cancel()
+
+            self._save_timer = threading.Timer(delay, self._do_save_config)
+            self._save_timer.daemon = True
+            self._save_timer.start()
+
     def save(self) -> None:
         """Trigger debounced save of configuration."""
-        self.save_timer.start(PERFORMANCE_CONFIG["debounce_delay"])
+        delay_seconds = PERFORMANCE_CONFIG["debounce_delay"] / 1000.0
+        self._schedule_save(delay_seconds)
 
     def flush(self) -> None:
         """Force immediate save of configuration."""
-        self.save_timer.stop()
+        with self._timer_lock:
+            if self._save_timer is not None:
+                self._save_timer.cancel()
+                self._save_timer = None
         self._do_save_config()
 
     def _load_config(self) -> None:
@@ -159,6 +169,7 @@ class ConfigManager:
             "theme": "dark",
             "notifications_enabled": True,
             "log_level": "INFO",
+            "telemetry_enabled": False,
         }
 
     def _validate_config(self, config: Dict[str, Any]) -> None:
