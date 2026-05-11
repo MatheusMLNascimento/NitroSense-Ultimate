@@ -32,8 +32,10 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QThread, pyqtSignal, QObject
 
 from nitrosense.core.logger import setup_logging, logger
-from nitrosense.core.app_config import parse_args
-from nitrosense.core.app_state import (
+from nitrosense.core.config_manager import parse_args
+from nitrosense.core.app_lifecycle import (
+    setup_signal_handlers,
+    setup_atexit_cleanup,
     ensure_session_lock,
     clear_session_lock,
     check_previous_crash,

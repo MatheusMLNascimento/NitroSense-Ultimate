@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 from .logger import logger
-from .constants import THERMAL_CONFIG, PERFORMANCE_CONFIG
+from .constants import THERMAL_CONFIG, PERFORMANCE_CONFIG, CONFIG_DIRS
 
 
 class ConfigManager:
@@ -35,7 +35,7 @@ class ConfigManager:
         if self._initialized:
             return
 
-        self.config_dir = Path.home() / ".config" / "nitrosense"
+        self.config_dir = CONFIG_DIRS["base"]
         self.config_file = self.config_dir / "config.json"
         self._lock = threading.RLock()
         self._timer_lock = threading.Lock()

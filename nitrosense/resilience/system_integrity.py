@@ -140,3 +140,122 @@ class SystemIntegrityCheck:
         logger.info("=" * 60)
         
         return report
+
+
+class DependencyInstaller:
+    """
+    Manages automatic installation of missing system and Python dependencies.
+    """
+
+    # System dependencies that can be auto-installed
+    APT_PACKAGES = {
+        "nbfc": "nbfc",
+        "nvidia-smi": "nvidia-utils-470",  # Adjust version as needed
+        "sensors": "lm-sensors",
+        "pkexec": "policykit-1",
+        "ec_probe": "ec-probe",
+    }
+
+    # Python packages that can be auto-installed
+    PIP_PACKAGES = {
+        "psutil": "psutil",
+        "PyQt6": "PyQt6",
+        "pystray": "pystray",
+        "pynput": "pynput",
+    }
+
+    def __init__(self):
+        self.has_sudo = self._check_sudo()
+        self.has_pip = self._check_pip()
+        logger.info(f"DependencyInstaller initialized (sudo: {self.has_sudo}, pip: {self.has_pip})")
+
+    def can_install_automatically(self) -> bool:
+        """Check if automatic installation is possible."""
+        return self.has_sudo and self.has_pip
+
+    def check_missing_dependencies(self) -> Tuple[Dict[str, List[str]], Dict[str, List[str]]]:
+        """Check for missing system and Python dependencies."""
+        logger.info("Checking for missing dependencies...")
+        missing_apt = {}
+        missing_pip = {}
+
+        # Check system tools
+        for tool, package in self.APT_PACKAGES.items():
+            if not self._is_tool_available(tool):
+                missing_apt[tool] = [package]
+
+        # Check Python packages
+        for module_name, pip_name in self.PIP_PACKAGES.items():
+            if not self._is_python_package_available(module_name):
+                missing_pip[module_name] = [pip_name]
+
+        return missing_apt, missing_pip
+
+    def install_apt_packages(self, packages: List[str]) -> bool:
+        """Install APT packages with retry logic."""
+        if not self.has_sudo:
+            logger.error("Cannot install APT packages: no sudo available")
+            return False
+
+        try:
+            cmd = ["sudo", "apt-get", "update"]
+            subprocess.run(cmd, check=True, timeout=60, capture_output=True)
+
+            cmd = ["sudo", "apt-get", "install", "-y"] + packages
+            result = subprocess.run(cmd, check=True, timeout=300, capture_output=True)
+            logger.info(f"Successfully installed APT packages: {packages}")
+            return True
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to install APT packages: {e}")
+            return False
+
+    def install_pip_packages(self, packages: List[str]) -> bool:
+        """Install Python packages via pip."""
+        if not self.has_pip:
+            logger.error("Cannot install pip packages: pip not available")
+            return False
+
+        try:
+            cmd = [sys.executable, "-m", "pip", "install"] + packages
+            result = subprocess.run(cmd, check=True, timeout=120, capture_output=True)
+            logger.info(f"Successfully installed pip packages: {packages}")
+            return True
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to install pip packages: {e}")
+            return False
+
+    def _check_sudo(self) -> bool:
+        """Check if passwordless sudo is available."""
+        try:
+            result = subprocess.run(
+                ["sudo", "-n", "true"],
+                capture_output=True,
+                timeout=5
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    def _check_pip(self) -> bool:
+        """Check if pip is available."""
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "pip", "--version"],
+                capture_output=True,
+                timeout=5
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    def _is_tool_available(self, tool: str) -> bool:
+        """Check if a system tool is available."""
+        return shutil.which(tool) is not None
+
+    def _is_python_package_available(self, module_name: str) -> bool:
+        """Check if a Python package is available."""
+        try:
+            __import__(module_name)
+            return True
+        except ImportError:
+            return False

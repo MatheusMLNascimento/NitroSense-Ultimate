@@ -25,7 +25,7 @@ from typing import Optional, Tuple, Dict, Any, List
 from PyQt6.QtCore import QSemaphore
 from ..core.logger import logger
 from ..core.command_executor import CommandExecutor
-from ..core.constants import PERFORMANCE_CONFIG, SYSTEM_PATHS, SUPPORTED_MODELS, RETRY_CONFIG, ErrorCode
+from ..core.constants import PERFORMANCE_CONFIG, SYSTEM_PATHS, SUPPORTED_MODELS, RETRY_CONFIG, ErrorCode, SYSFS_PATHS
 from .interface import HardwareInterface
 
 

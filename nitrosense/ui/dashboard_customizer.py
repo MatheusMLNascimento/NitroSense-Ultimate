@@ -24,7 +24,7 @@ import json
 from pathlib import Path
 from typing import Dict, List, Optional
 from ..core.logger import logger
-from ..core.constants import COLOR_SCHEME
+from ..core.constants import COLOR_SCHEME, CONFIG_DIRS
 
 
 class DraggableWidget(QFrame):
@@ -157,7 +157,7 @@ class DashboardController:
     def _load_dashboard_config(self) -> None:
         """Load dashboard configuration from file."""
         try:
-            config_path = Path.home() / ".config" / "nitrosense" / "dashboard.json"
+            config_path = CONFIG_DIRS["dashboard"]
             
             if config_path.exists():
                 with open(config_path, 'r') as f:
@@ -177,7 +177,7 @@ class DashboardController:
     def _save_dashboard_config(self) -> None:
         """Save dashboard configuration to file."""
         try:
-            config_path = Path.home() / ".config" / "nitrosense" / "dashboard.json"
+            config_path = CONFIG_DIRS["dashboard"]
             config_path.parent.mkdir(parents=True, exist_ok=True)
             
             dashboard_config = {

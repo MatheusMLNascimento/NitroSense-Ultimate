@@ -12,6 +12,7 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QPixmap
 
 from ..core.logger import logger
+from ..core.constants import CONFIG_DIRS
 from ..resilience.dependency_installer import DependencyInstaller
 
 
@@ -304,9 +305,9 @@ Para habilitar instalação automática no futuro:
     def _save_install_preference(self, auto_install: bool):
         """Save user's preference for automatic installation."""
         try:
-            config_dir = Path.home() / ".config" / "nitrosense"
+            config_dir = CONFIG_DIRS["base"]
             config_dir.mkdir(parents=True, exist_ok=True)
-            config_file = config_dir / "install_preferences.json"
+            config_file = CONFIG_DIRS["install_prefs"]
 
             import json
             prefs = {"auto_install_dependencies": auto_install}
@@ -319,7 +320,7 @@ Para habilitar instalação automática no futuro:
     def load_install_preference() -> Optional[bool]:
         """Load user's saved preference for automatic installation."""
         try:
-            config_file = Path.home() / ".config" / "nitrosense" / "install_preferences.json"
+            config_file = CONFIG_DIRS["install_prefs"]
             if config_file.exists():
                 import json
                 prefs = json.loads(config_file.read_text())

@@ -12,7 +12,7 @@ from PyQt6.QtGui import QFont, QIntValidator, QDoubleValidator
 from ...core.logger import logger
 from ...core.constants import COLOR_SCHEME, THERMAL_CONFIG
 from ...hardware.manager import HardwareManager
-from ..icon_theme import load_icon
+from ..theming import load_icon
 
 
 class ConfigPage(QWidget):

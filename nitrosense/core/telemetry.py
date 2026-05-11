@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from .logger import logger
+from .constants import CONFIG_DIRS
 
 
 class TelemetryClient:
@@ -17,9 +18,9 @@ class TelemetryClient:
 
     def __init__(self, enabled: bool = False, storage_dir: Optional[Path] = None) -> None:
         self.enabled = enabled
-        self.storage_dir = storage_dir or Path.home() / ".config" / "nitrosense"
+        self.storage_dir = storage_dir or CONFIG_DIRS["base"]
         self.storage_dir.mkdir(parents=True, exist_ok=True)
-        self.storage_path = self.storage_dir / "telemetry.json"
+        self.storage_path = CONFIG_DIRS["telemetry"]
         self._lock = threading.Lock()
         self._events: list[Dict[str, Any]] = []
 

@@ -13,7 +13,7 @@ from ...core.logger import logger
 from ...core.constants import COLOR_SCHEME
 from ...hardware.interface import HardwareInterface
 from ...security.diagnostics import SecurityAndDiagnostics
-from ..icon_theme import load_icon_pixmap
+from ..theming import load_icon_pixmap
 
 
 class LabsPage(QWidget):

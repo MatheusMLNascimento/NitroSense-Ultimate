@@ -16,6 +16,7 @@ import importlib.util
 
 from ..core.logger import logger
 from ..core.error_codes import ErrorCode, SafeOperation
+from ..core.constants import SYSFS_PATHS
 
 
 class BackendValidation:

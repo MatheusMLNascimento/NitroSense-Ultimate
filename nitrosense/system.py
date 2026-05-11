@@ -7,7 +7,7 @@ from typing import Dict, Tuple, Optional
 
 from .core.logger import logger
 from .core.error_codes import ErrorCode, is_critical, get_error_description
-from .core.config import ConfigManager
+from .core.config_manager import ConfigManager
 from .hardware.manager import HardwareManager
 from .core.monitoring import MonitoringEngine
 from .automation.ai_engine import PredictiveAIEngine
@@ -34,8 +34,7 @@ class NitroSenseSystem:
         self.config_manager: ConfigManager = None
         self.hardware_manager: HardwareManager = None
         self.monitoring: MonitoringEngine = None
-        self.ai_engine: PredictiveAIEngine = None
-        self.fan_controller: FanController = None
+        self.automation_engine: AutomationEngine = None
         self.security: SecurityAndDiagnostics = None
         self.validation: BackendValidation = None
         self.initialized = False
@@ -94,16 +93,8 @@ class NitroSenseSystem:
             
             # 5. AI Engine (depends on monitoring)
             logger.info("🔧 Initializing AI engine...")
-            self.ai_engine = PredictiveAIEngine(self.monitoring, self.hardware_manager, self.config_manager)
-            logger.info("✅ PredictiveAIEngine ready")
-            
-            # 6. Fan Controller (depends on hw + ai)
-            logger.info("🔧 Starting fan controller...")
-            self.fan_controller = FanController(
-                self.hardware_manager,
-                self.config_manager
-            )
-            logger.info("✅ FanController ready")
+            self.automation_engine = AutomationEngine(self.monitoring, self.hardware_manager, self.config_manager)
+            logger.info("✅ AutomationEngine ready")
             
             # 7. Security & Diagnostics
             logger.info("🔧 Enabling security module...")

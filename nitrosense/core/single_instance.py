@@ -104,7 +104,7 @@ class SingleInstanceLock:
         """
         try:
             # Use ~/.config/nitrosense for lock file
-            lock_dir = Path.home() / ".config" / "nitrosense"
+            lock_dir = CONFIG_DIRS["base"]
             lock_dir.mkdir(parents=True, exist_ok=True)
             self._lock_file = lock_dir / "nitrosense.lock"
             

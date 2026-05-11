@@ -10,10 +10,11 @@ import time
 from pathlib import Path
 from typing import Optional
 
+from .constants import CONFIG_DIRS
 from .logger import logger
 
 
-SESSION_LOCK_DIR = Path.home() / ".config" / "nitrosense"
+SESSION_LOCK_DIR = CONFIG_DIRS["base"]
 SESSION_LOCK_FILE = SESSION_LOCK_DIR / ".session_lock"
 
 

@@ -15,7 +15,7 @@ from ...core.monitoring import MonitoringEngine
 from ...automation.ai_engine import PredictiveAIEngine
 from ...automation.fan_control import FanController
 from ...hardware.manager import HardwareManager
-from ...ui.icon_theme import load_icon_pixmap, load_icon
+from ...ui.theming import load_icon_pixmap, load_icon
 
 
 class MetricCard(QFrame):
@@ -297,7 +297,7 @@ class HomePage(QWidget):
     def _apply_fan_speed(self) -> None:
         try:
             value = self.fan_speed_slider.value()
-            self.fan_controller.set_fan_speed(value)
+            self.automation_engine.set_fan_speed(value)
             self.status_label.setText(f"Fan speed set to {value}%")
             self.auto_mode = False  # Disable auto mode when slider is used
             self.mode_label.setText("Mode: Manual")
@@ -348,7 +348,7 @@ class HomePage(QWidget):
                 self.cpu_card.value_label.setText(f"{cpu_temp:.1f}°C")
                 self._update_color(cpu_temp)
                 if hasattr(self, 'cooldown_label'):
-                    self.cooldown_label.setText(f"Cooldown: {self.ai_engine.get_cooldown_estimate(cpu_temp)}")
+                    self.cooldown_label.setText(f"Cooldown: {self.automation_engine.get_cooldown_estimate(cpu_temp)}")
 
             if gpu_temp is not None:
                 self.gpu_card.value_label.setText(f"{gpu_temp:.1f}°C")
@@ -359,23 +359,23 @@ class HomePage(QWidget):
 
             # Thermal gradient
             temp_delta = self.monitoring.get_temperature_delta()
-            trend = self.ai_engine.calculate_thermal_gradient(
+            trend = self.automation_engine.calculate_thermal_gradient(
                 temp_delta
             )
             if hasattr(self, 'trend_label'):
                 self.trend_label.setText(f"Trend: {trend}")
 
-            profile_event = self.ai_engine.refresh_profile_state()
+            profile_event = self.automation_engine.refresh_profile_state()
             if profile_event == "closed":
                 if hasattr(self, 'status_label'):
                     self.status_label.setText("Game closed, silent mode restored")
 
             # Calculate and apply speed
             if cpu_temp and not hasattr(self, '_frost_mode_active') and self.auto_mode:
-                required_speed = self.ai_engine.calculate_required_speed(
+                required_speed = self.automation_engine.calculate_required_speed(
                     cpu_temp, temp_delta
                 )
-                self.fan_controller.set_fan_speed(required_speed)
+                self.automation_engine.set_fan_speed(required_speed)
                 self.fan_label.setText(f"Fan: {required_speed}%")
                 self.fan_speed_slider.setValue(required_speed)  # Sync slider
 
@@ -439,7 +439,7 @@ class HomePage(QWidget):
         """Activate Frost Mode."""
         try:
             logger.info("Frost mode activated")
-            self.fan_controller.frost_mode_engage(120)
+            self.automation_engine.frost_mode_engage(120)
             self.status_label.setText("FROST MODE ACTIVE (120s)")
         except Exception as e:
             logger.error(f"Frost mode error: {e}")

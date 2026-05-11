@@ -12,7 +12,7 @@ from ...core.logger import logger
 from ...core.constants import COLOR_SCHEME
 from ...core.monitoring import MonitoringEngine
 from ...hardware.interface import HardwareInterface
-from ..icon_theme import load_icon_pixmap
+from ..theming import load_icon_pixmap
 
 
 class StatusPage(QWidget):

@@ -25,7 +25,7 @@ from datetime import datetime
 from threading import Thread
 
 from ..core.logger import logger
-from ..core.constants import APP_CONFIG
+from ..core.constants import APP_CONFIG, CONFIG_DIRS
 
 
 class HotkeysManager:
@@ -187,7 +187,7 @@ class CrashReporter:
     Generates detailed crash reports with system state at time of crash.
     """
     
-    CRASH_REPORT_FILE = Path.home() / ".config" / "nitrosense" / "last_crash_report.txt"
+    CRASH_REPORT_FILE = CONFIG_DIRS["crash_report"]
     
     @staticmethod
     def generate_crash_report(exception: Exception, traceback_str: str = "") -> str:

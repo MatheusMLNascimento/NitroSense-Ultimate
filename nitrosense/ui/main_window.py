@@ -26,11 +26,11 @@ from PyQt6.QtGui import QFont, QGuiApplication, QIcon
 from ..core.logger import logger
 from ..core.constants import APP_CONFIG, COLOR_SCHEME
 from ..i18n import t
-from .icon_theme import load_icon
+from .theming import load_icon
 from .notifications import ToastManager
-from .window_state import WindowStateManager, ApplicationStateManager
+from .ui_state_manager import WindowStateManager, ApplicationStateManager
 from .tray_icon import DynamicTrayIcon, TrayMenuBuilder, AutostartManager
-from .ux_utilities import DebouncedSlider, LoadingButton
+from .widget_builders import DebouncedSlider, LoadingButton
 from .pages.home_page import HomePage
 from .pages.status_page import StatusPage
 from .pages.config_page import ConfigPage
